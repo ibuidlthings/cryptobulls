@@ -30,7 +30,11 @@ pub fn handler(ctx: Context<Initialize>, token_mint: Pubkey) -> Result<()> {
     bank.free_tiers = Vec::new();
     bank.authority = ctx.accounts.authority.key();
     bank.bump = ctx.bumps.bank;
-    bank.reserved = [0u8; 64];
+    // collection_mint stays Pubkey::default() until initialize_collection
+    // is called. wrap_bull rejects any wrap before that with
+    // CollectionNotInitialized.
+    bank.collection_mint = Pubkey::default();
+    bank.reserved = [0u8; 32];
 
     msg!(
         "Bullpeg initialized: mint={}, max_bulls={}",

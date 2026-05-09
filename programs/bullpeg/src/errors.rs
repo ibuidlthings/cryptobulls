@@ -28,4 +28,16 @@ pub enum BullpegError {
 
     #[msg("Vault balance is not exactly 1,000,000 tokens")]
     VaultBalanceMismatch,
+
+    #[msg("Metaplex Certified Collection not initialized — call initialize_collection first")]
+    CollectionNotInitialized,
+
+    #[msg("Provided collection mint does not match BullBank.collection_mint")]
+    WrongCollection,
+
+    #[msg("Collection NFT already initialized (idempotency guard)")]
+    CollectionAlreadyInitialized,
+
+    #[msg("Caller is not the program authority recorded in BullBank")]
+    NotProgramAuthority,
 }

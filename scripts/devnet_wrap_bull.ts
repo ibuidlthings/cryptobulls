@@ -32,14 +32,22 @@ async function main() {
   );
   const bank = await (program.account as any).bullBank.fetch(bankPda);
   const tokenMint = bank.tokenMint as PublicKey;
+  const collectionMint = bank.collectionMint as PublicKey;
   const tier = (bank.freeTiers.length > 0
     ? bank.freeTiers[bank.freeTiers.length - 1]
     : bank.nextTier) as number;
 
-  console.log("program:    ", program.programId.toBase58());
-  console.log("bank:       ", bankPda.toBase58());
-  console.log("token mint: ", tokenMint.toBase58());
-  console.log("next tier:  ", tier);
+  if (collectionMint.toBase58() === PublicKey.default.toBase58()) {
+    throw new Error(
+      "Collection NFT not initialized — run scripts/devnet_initialize_collection.ts first."
+    );
+  }
+
+  console.log("program:        ", program.programId.toBase58());
+  console.log("bank:           ", bankPda.toBase58());
+  console.log("token mint:     ", tokenMint.toBase58());
+  console.log("collection_mint:", collectionMint.toBase58());
+  console.log("next tier:      ", tier);
 
   const nftMint = Keypair.generate();
   console.log("new nft mint:", nftMint.publicKey.toBase58());
@@ -68,11 +76,28 @@ async function main() {
     TOKEN_METADATA_PROGRAM_ID
   );
 
+  // Collection PDAs (program PDA signs verify_sized_collection_item)
+  const [collectionAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_authority")],
+    program.programId,
+  );
+  const [collectionMetadata] = PublicKey.findProgramAddressSync(
+    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), collectionMint.toBuffer()],
+    TOKEN_METADATA_PROGRAM_ID,
+  );
+  const [collectionMasterEdition] = PublicKey.findProgramAddressSync(
+    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), collectionMint.toBuffer(), Buffer.from("edition")],
+    TOKEN_METADATA_PROGRAM_ID,
+  );
+
   console.log("vault:        ", vault.toBase58());
   console.log("vault auth:   ", vaultAuthority.toBase58());
   console.log("metadata:     ", metadata.toBase58());
   console.log("master edition:", masterEdition.toBase58());
   console.log("bull asset:   ", bullAsset.toBase58());
+  console.log("collection_metadata:      ", collectionMetadata.toBase58());
+  console.log("collection_master_edition:", collectionMasterEdition.toBase58());
+  console.log("collection_authority PDA: ", collectionAuthority.toBase58());
 
   const cuBump = ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 });
 
@@ -91,6 +116,10 @@ async function main() {
       bullAsset,
       metadata,
       masterEdition,
+      collectionMint,
+      collectionMetadata,
+      collectionMasterEdition,
+      collectionAuthority,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,

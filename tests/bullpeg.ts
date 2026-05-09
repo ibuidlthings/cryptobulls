@@ -40,11 +40,90 @@ import {
 } from "@solana/spl-token";
 import { expect } from "chai";
 import { Bullpeg } from "../target/types/bullpeg";
+// Metaplex deserializer (v3 / Umi-based SDK) — used to read
+// metadata.collection.verified after each wrap to prove the Metaplex
+// Certified Collection (MCC) link is set. The serializer returns
+// `[parsedData, bytesRead]`; pubkeys come back as base58 strings.
+import {
+  getMetadataAccountDataSerializer,
+} from "@metaplex-foundation/mpl-token-metadata";
+
+const METADATA_SERIALIZER = getMetadataAccountDataSerializer();
+function decodeMetadata(data: Uint8Array): any {
+  const [parsed] = METADATA_SERIALIZER.deserialize(data);
+  return parsed;
+}
 
 // Metaplex Token Metadata program — same on every cluster
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
+
+// Helper: derive collection-related PDAs (used by every wrap_bull /
+// unwrap_bull / initialize_collection call after MCC was added).
+function deriveCollectionPdas(
+  programId: PublicKey,
+  collectionMint: PublicKey,
+  authority: PublicKey,
+) {
+  const [collectionAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_authority")],
+    programId,
+  );
+  const [collectionMetadata] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata"),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      collectionMint.toBuffer(),
+    ],
+    TOKEN_METADATA_PROGRAM_ID,
+  );
+  const [collectionMasterEdition] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata"),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      collectionMint.toBuffer(),
+      Buffer.from("edition"),
+    ],
+    TOKEN_METADATA_PROGRAM_ID,
+  );
+  const authorityCollectionAta = getAssociatedTokenAddressSync(
+    collectionMint,
+    authority,
+  );
+  return {
+    collectionAuthority,
+    collectionMetadata,
+    collectionMasterEdition,
+    authorityCollectionAta,
+  };
+}
+
+// Helper: read the on-chain Metaplex metadata for a bull's NFT and assert
+// metadata.collection is set to the expected collection mint AND verified
+// is true. This is the central proof that MCC is wired correctly.
+async function assertVerifiedCollection(
+  connection: anchor.web3.Connection,
+  metadataPda: PublicKey,
+  expectedCollectionMint: PublicKey,
+) {
+  const acc = await connection.getAccountInfo(metadataPda);
+  if (!acc) throw new Error(`metadata account ${metadataPda} not found`);
+  const meta = decodeMetadata(acc.data);
+  // In v3 SDK, optional fields are wrapped in Umi's `Option` type — either
+  // `{ __option: 'Some', value: ... }` (newer) or just the value/null (older
+  // serializer output). Handle both shapes defensively.
+  const collection = meta.collection?.__option === "Some"
+    ? meta.collection.value
+    : meta.collection;
+  if (!collection) throw new Error("metadata.collection is null/None");
+  // Pubkeys come back as base58 strings in Umi.
+  const collectionKey = typeof collection.key === "string"
+    ? collection.key
+    : collection.key.toString();
+  expect(collectionKey).to.equal(expectedCollectionMint.toBase58());
+  expect(collection.verified).to.equal(true);
+}
 
 // Helper: derive all PDAs needed for a wrap/unwrap call
 interface WrapBullPdas {
@@ -123,6 +202,10 @@ describe("bullpeg", () => {
   // === Test state ===
   let tokenMint: PublicKey;
   let bankPda: PublicKey;
+  // Collection NFT mint (created by initialize_collection test). All wrap
+  // calls reference this so the program can verify each bull NFT into the
+  // collection.
+  let collectionMint: Keypair;
 
   // Test wallets — funded with SOL + $TOKEN
   let alice: Keypair;
@@ -200,6 +283,92 @@ describe("bullpeg", () => {
     expect(bank.inCirculation).to.equal(0);
     expect(bank.nextTier).to.equal(1);
     expect(bank.freeTiers).to.deep.equal([]);
+    // Collection not yet initialized — collection_mint is Pubkey::default()
+    expect(bank.collectionMint.toBase58()).to.equal(
+      PublicKey.default.toBase58(),
+    );
+  });
+
+  it("initializes the Metaplex Certified Collection", async () => {
+    collectionMint = Keypair.generate();
+    const { collectionAuthority, collectionMetadata, collectionMasterEdition,
+            authorityCollectionAta } =
+      deriveCollectionPdas(program.programId, collectionMint.publicKey, alice.publicKey);
+
+    await program.methods
+      .initializeCollection()
+      .accounts({
+        bank: bankPda,
+        authority: alice.publicKey,
+        collectionMint: collectionMint.publicKey,
+        collectionAuthority,
+        authorityCollectionAta,
+        collectionMetadata,
+        collectionMasterEdition,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .preInstructions([CU_BUMP], true)
+      .signers([alice, collectionMint])
+      .rpc();
+
+    // Bank now records the collection mint
+    const bank = await program.account.bullBank.fetch(bankPda);
+    expect(bank.collectionMint.toBase58()).to.equal(
+      collectionMint.publicKey.toBase58(),
+    );
+
+    // Collection NFT exists in alice's ATA (1 supply)
+    const ata = await getAccount(connection, authorityCollectionAta);
+    expect(ata.amount).to.equal(1n);
+
+    // Collection metadata is a sized collection (CollectionDetails::V1)
+    const acc = await connection.getAccountInfo(collectionMetadata);
+    expect(acc).to.not.be.null;
+    const meta = decodeMetadata(acc!.data);
+    const cd = meta.collectionDetails?.__option === "Some"
+      ? meta.collectionDetails.value
+      : meta.collectionDetails;
+    if (!cd) throw new Error("collection metadata has no collectionDetails");
+    // size starts at 0; increments with each verify_sized_collection_item
+    expect(Number(cd.size)).to.equal(0);
+  });
+
+  it("initialize_collection is idempotent — re-running fails", async () => {
+    const dupCollectionMint = Keypair.generate();
+    const { collectionAuthority, collectionMetadata, collectionMasterEdition,
+            authorityCollectionAta } =
+      deriveCollectionPdas(program.programId, dupCollectionMint.publicKey, alice.publicKey);
+
+    let errored = false;
+    try {
+      await program.methods
+        .initializeCollection()
+        .accounts({
+          bank: bankPda,
+          authority: alice.publicKey,
+          collectionMint: dupCollectionMint.publicKey,
+          collectionAuthority,
+          authorityCollectionAta,
+          collectionMetadata,
+          collectionMasterEdition,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .preInstructions([CU_BUMP], true)
+        .signers([alice, dupCollectionMint])
+        .rpc();
+    } catch (e: any) {
+      errored = true;
+      expect(e.toString()).to.include("CollectionAlreadyInitialized");
+    }
+    expect(errored).to.equal(true);
   });
 
   it("wrap_bull: alice wraps 1M $TOKEN into bull tier 1", async () => {
@@ -207,6 +376,9 @@ describe("bullpeg", () => {
     const nftMint = Keypair.generate();
     const pdas = deriveWrapPdas(
       program.programId, tierIndex, nftMint.publicKey, tokenMint, alice.publicKey
+    );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
     );
 
     const aliceBalanceBefore = (await getAccount(connection, aliceTokenAccount)).amount;
@@ -225,6 +397,10 @@ describe("bullpeg", () => {
         bullAsset: pdas.bullAsset,
         metadata: pdas.metadata,
         masterEdition: pdas.masterEdition,
+        collectionMint: collectionMint.publicKey,
+        collectionMetadata: collPdas.collectionMetadata,
+        collectionMasterEdition: collPdas.collectionMasterEdition,
+        collectionAuthority: collPdas.collectionAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -257,6 +433,19 @@ describe("bullpeg", () => {
     expect(bank.totalWrapped.toNumber()).to.equal(1);
     expect(bank.inCirculation).to.equal(1);
     expect(bank.nextTier).to.equal(2);
+
+    // CRITICAL: bull's metadata.collection.verified === true
+    await assertVerifiedCollection(
+      connection, pdas.metadata, collectionMint.publicKey,
+    );
+
+    // Collection size counter incremented to 1
+    const collMetaAcc = await connection.getAccountInfo(collPdas.collectionMetadata);
+    const collMeta = decodeMetadata(collMetaAcc!.data);
+    const cd = collMeta.collectionDetails?.__option === "Some"
+      ? collMeta.collectionDetails.value
+      : collMeta.collectionDetails;
+    expect(Number(cd.size)).to.equal(1);
   });
 
   it("unwrap_bull: alice unwraps her bull, gets 1M $TOKEN back", async () => {
@@ -273,6 +462,9 @@ describe("bullpeg", () => {
 
     const pdas = deriveWrapPdas(
       program.programId, tierIndex, nftMint, tokenMint, alice.publicKey
+    );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
     );
 
     const aliceBalanceBefore = (await getAccount(connection, aliceTokenAccount)).amount;
@@ -291,6 +483,8 @@ describe("bullpeg", () => {
         bullAsset: pdas.bullAsset,
         metadata: pdas.metadata,
         masterEdition: pdas.masterEdition,
+        collectionMint: collectionMint.publicKey,
+        collectionMetadata: collPdas.collectionMetadata,
         tokenProgram: TOKEN_PROGRAM_ID,
         tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       })
@@ -319,6 +513,9 @@ describe("bullpeg", () => {
     const pdas = deriveWrapPdas(
       program.programId, tierIndex, nftMint.publicKey, tokenMint, alice.publicKey
     );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
 
     await program.methods
       .wrapBull(tierIndex)
@@ -334,6 +531,10 @@ describe("bullpeg", () => {
         bullAsset: pdas.bullAsset,
         metadata: pdas.metadata,
         masterEdition: pdas.masterEdition,
+        collectionMint: collectionMint.publicKey,
+        collectionMetadata: collPdas.collectionMetadata,
+        collectionMasterEdition: collPdas.collectionMasterEdition,
+        collectionAuthority: collPdas.collectionAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -343,6 +544,11 @@ describe("bullpeg", () => {
       .preInstructions([CU_BUMP], true)
       .signers([alice, nftMint])
       .rpc();
+
+    // Re-rolled visual is also verified into the collection
+    await assertVerifiedCollection(
+      connection, pdas.metadata, collectionMint.publicKey,
+    );
 
     // BullAsset has the NEW nft_mint (visual re-rolled)
     const bullAsset = await program.account.bullAsset.fetch(pdas.bullAsset);
@@ -386,6 +592,9 @@ describe("bullpeg", () => {
     const pdas = deriveWrapPdas(
       program.programId, tierIndex, nftMint, tokenMint, bob.publicKey
     );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
 
     const bobBalanceBefore = (await getAccount(connection, bobTokenAccount)).amount;
 
@@ -403,6 +612,8 @@ describe("bullpeg", () => {
         bullAsset: pdas.bullAsset,
         metadata: pdas.metadata,
         masterEdition: pdas.masterEdition,
+        collectionMint: collectionMint.publicKey,
+        collectionMetadata: collPdas.collectionMetadata,
         tokenProgram: TOKEN_PROGRAM_ID,
         tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       })
@@ -426,6 +637,9 @@ describe("bullpeg", () => {
     const pdas = deriveWrapPdas(
       program.programId, tierIndex, nftMint.publicKey, tokenMint, carol.publicKey
     );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
 
     // Carol has 0 $TOKEN — should fail
     let errored = false;
@@ -444,6 +658,10 @@ describe("bullpeg", () => {
           bullAsset: pdas.bullAsset,
           metadata: pdas.metadata,
           masterEdition: pdas.masterEdition,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: collPdas.collectionMetadata,
+          collectionMasterEdition: collPdas.collectionMasterEdition,
+          collectionAuthority: collPdas.collectionAuthority,
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -461,6 +679,10 @@ describe("bullpeg", () => {
   });
 
   it("wraps multiple bulls and counters track correctly", async () => {
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
+
     // Alice wraps tiers 1, 2, 3
     for (const tierIndex of [1, 2, 3]) {
       const nftMint = Keypair.generate();
@@ -482,6 +704,10 @@ describe("bullpeg", () => {
           bullAsset: pdas.bullAsset,
           metadata: pdas.metadata,
           masterEdition: pdas.masterEdition,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: collPdas.collectionMetadata,
+          collectionMasterEdition: collPdas.collectionMasterEdition,
+          collectionAuthority: collPdas.collectionAuthority,
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -491,6 +717,11 @@ describe("bullpeg", () => {
         .preInstructions([CU_BUMP], true)
         .signers([alice, nftMint])
         .rpc();
+
+      // Each one is a verified collection member
+      await assertVerifiedCollection(
+        connection, pdas.metadata, collectionMint.publicKey,
+      );
     }
 
     const bank = await program.account.bullBank.fetch(bankPda);

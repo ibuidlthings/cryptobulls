@@ -89,9 +89,14 @@ function check(name, ok, detail) {
     freeTiers.push(bankInfo.data.readUInt16LE(off));
     off += 2;
   }
+  // After free_tiers there's: authority(32) + bump(1) + collection_mint(32)
+  // We skip directly to collection_mint via fixed offset from free_tiers end.
+  off += 32 + 1; // authority + bump
+  const collectionMint = new PublicKey(bankInfo.data.slice(off, off + 32));
 
   console.log('Bank state:');
   console.log('  token_mint:     ' + tokenMint.toBase58());
+  console.log('  collection_mint:' + collectionMint.toBase58());
   console.log('  total_wrapped:  ' + totalWrapped);
   console.log('  total_unwrapped:' + totalUnwrapped);
   console.log('  in_circulation: ' + inCirc);
@@ -167,6 +172,15 @@ function check(name, ok, detail) {
   check('4. all live NFT mints have supply == 1',
         supplyMismatch === 0,
         \`mismatches=\${supplyMismatch} of \${liveBulls.length}\`);
+
+  // INVARIANT 7: Metaplex Certified Collection is initialized
+  // (collection_mint != Pubkey::default = 11111...1).
+  const SYSTEM_DEFAULT_KEY = '11111111111111111111111111111111';
+  check('7. collection_mint is set (Metaplex Certified Collection initialized)',
+        collectionMint.toBase58() !== SYSTEM_DEFAULT_KEY,
+        collectionMint.toBase58() === SYSTEM_DEFAULT_KEY
+          ? 'run scripts/devnet_initialize_collection.ts'
+          : '');
 
   console.log('');
   if (failures.length === 0) {

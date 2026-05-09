@@ -51,6 +51,16 @@ pub mod bullpeg {
         instructions::initialize::handler(ctx, token_mint)
     }
 
+    /// One-time setup: creates the Metaplex Certified Collection (MCC)
+    /// parent NFT. Must be called by `bank.authority` exactly once. After
+    /// this, every wrap_bull verifies its NFT into this collection so
+    /// Magic Eden / Tensor / Phantom recognise the bulls as a real
+    /// collection (no DYOR warnings, searchable by collection, floor
+    /// pricing surfaces).
+    pub fn initialize_collection(ctx: Context<InitializeCollection>) -> Result<()> {
+        instructions::initialize_collection::handler(ctx)
+    }
+
     /// Wrap 1M $TOKEN into a fresh bull NFT.
     ///
     /// Caller must:

@@ -152,6 +152,21 @@ else
 fi
 
 # ============================================================
+# Step 2.5 — Initialize Metaplex Certified Collection
+# ============================================================
+# Without this, every bull NFT shows DYOR / "unverified collection"
+# warnings on Magic Eden + is non-discoverable on Tensor.
+#
+# The script is idempotent: if bank.collection_mint is already set,
+# it logs and exits 0. Safe to re-run.
+echo ""
+echo "=== Step 2.5: initialize Metaplex Certified Collection ==="
+
+ANCHOR_PROVIDER_URL=https://api.mainnet-beta.solana.com \
+ANCHOR_WALLET="$KEYPAIR" \
+  npx ts-node scripts/devnet_initialize_collection.ts
+
+# ============================================================
 # Step 3 — Update web service env to mainnet + restart
 # ============================================================
 echo ""

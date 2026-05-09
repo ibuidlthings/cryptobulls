@@ -109,6 +109,26 @@ pub struct UnwrapBull<'info> {
     #[account(mut)]
     pub master_edition: UncheckedAccount<'info>,
 
+    // ============ Metaplex Certified Collection accounts ============
+    //
+    // burn_nft on a verified-collection NFT decrements
+    // collection_metadata.collection_details.size, so we must pass the
+    // collection's metadata as `mut` and include it in remaining accounts.
+
+    /// Collection NFT mint (must equal `bank.collection_mint`).
+    /// Required for the burn_nft CPI on verified collection members.
+    /// CHECK: pubkey-equality validated via constraint.
+    #[account(
+        constraint = collection_mint.key() == bank.collection_mint
+            @ BullpegError::WrongCollection,
+    )]
+    pub collection_mint: UncheckedAccount<'info>,
+
+    /// Collection NFT's Metaplex metadata account (mut — burn decrements size).
+    /// CHECK: validated by Metaplex during the burn CPI.
+    #[account(mut)]
+    pub collection_metadata: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub token_metadata_program: Program<'info, Metadata>,
 }
@@ -155,6 +175,13 @@ pub fn handler(ctx: Context<UnwrapBull>, tier_index: u16) -> Result<()> {
     }
 
     // === 3. Burn the NFT (closes mint, ATA, metadata, master edition) ===
+    //
+    // The bull's metadata has `collection.verified = true` (set by
+    // verify_sized_collection_item during wrap_bull), so Metaplex's
+    // BurnNft requires:
+    //   - collection_metadata pubkey passed as the `Option<Pubkey>` arg
+    //   - collection_metadata AccountInfo in remaining_accounts (mut)
+    // so it can decrement collection_details.size on the parent collection.
     {
         let cpi_accounts = BurnNft {
             metadata: ctx.accounts.metadata.to_account_info(),
@@ -167,9 +194,11 @@ pub fn handler(ctx: Context<UnwrapBull>, tier_index: u16) -> Result<()> {
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_metadata_program.key(),
             cpi_accounts,
-        );
-        // collection_metadata = None (NFT is not part of a collection in v1)
-        metadata::burn_nft(cpi_ctx, None)?;
+        )
+        .with_remaining_accounts(vec![
+            ctx.accounts.collection_metadata.to_account_info(),
+        ]);
+        metadata::burn_nft(cpi_ctx, Some(ctx.accounts.collection_metadata.key()))?;
     }
 
     // === 4. Update bank: push tier back to free_tiers, update counters ===

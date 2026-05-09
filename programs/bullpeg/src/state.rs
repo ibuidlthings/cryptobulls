@@ -44,8 +44,20 @@ pub struct BullBank {
     /// PDA bump.
     pub bump: u8,
 
+    /// Metaplex Certified Collection (MCC) NFT mint. Set by
+    /// `initialize_collection` after `initialize`. Pubkey::default() until
+    /// then. Each `wrap_bull` references this and verifies the freshly
+    /// minted bull NFT into this collection (so Magic Eden / Tensor /
+    /// Phantom recognise the collection).
+    ///
+    /// Layout note: this slot was carved out of the original 64-byte
+    /// `reserved` block, so the on-chain account size is unchanged. Existing
+    /// banks deserialize this field as Pubkey::default() (all zeros) until
+    /// initialize_collection writes it.
+    pub collection_mint: Pubkey,
+
     /// Reserved for future fields. Do not remove without state migration.
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 32],
 }
 
 impl BullBank {
@@ -60,7 +72,8 @@ impl BullBank {
         + 4 + (MAX_BULLS as usize) * 2  // free_tiers vec (max capacity)
         + 32                            // authority
         + 1                             // bump
-        + 64;                           // reserved
+        + 32                            // collection_mint
+        + 32;                           // reserved (was 64; 32 carved out for collection_mint)
 
     /// Pop next available tier (free first, then fresh). Caller is responsible
     /// for incrementing in_circulation and total_wrapped.
@@ -143,7 +156,8 @@ mod tier_accounting_tests {
             free_tiers: Vec::new(),
             authority: Pubkey::default(),
             bump: 0,
-            reserved: [0u8; 64],
+            collection_mint: Pubkey::default(),
+            reserved: [0u8; 32],
         }
     }
 

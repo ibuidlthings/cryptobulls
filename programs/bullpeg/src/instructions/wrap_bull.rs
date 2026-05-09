@@ -5,8 +5,9 @@ use anchor_spl::token::{
 };
 use anchor_spl::metadata::{
     self,
-    mpl_token_metadata::types::DataV2,
+    mpl_token_metadata::types::{Collection, DataV2},
     CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+    VerifySizedCollectionItem,
 };
 
 use crate::state::{BullAsset, BullBank};
@@ -127,6 +128,45 @@ pub struct WrapBull<'info> {
     #[account(mut)]
     pub master_edition: UncheckedAccount<'info>,
 
+    // ============ Metaplex Certified Collection accounts ============
+    //
+    // Each wrap_bull verifies its NFT into the program-managed collection
+    // so Magic Eden / Tensor / Phantom recognise the bulls as a real
+    // collection. The collection is created once by `initialize_collection`
+    // and its mint is stored in `bank.collection_mint`.
+
+    /// Collection NFT mint (must equal `bank.collection_mint`).
+    /// Constraint blocks any wrap before the collection is initialized
+    /// (CollectionNotInitialized — bank.collection_mint == default).
+    /// CHECK: pubkey-equality validated via constraint; the Metaplex
+    /// verify CPI revalidates everything else.
+    #[account(
+        constraint = collection_mint.key() != Pubkey::default()
+            @ BullpegError::CollectionNotInitialized,
+        constraint = collection_mint.key() == bank.collection_mint
+            @ BullpegError::WrongCollection,
+    )]
+    pub collection_mint: UncheckedAccount<'info>,
+
+    /// Collection NFT's Metaplex metadata account.
+    /// CHECK: validated by Metaplex during the verify CPI.
+    #[account(mut)]
+    pub collection_metadata: UncheckedAccount<'info>,
+
+    /// Collection NFT's Metaplex master edition account.
+    /// CHECK: validated by Metaplex during the verify CPI.
+    pub collection_master_edition: UncheckedAccount<'info>,
+
+    /// Program PDA that signs verify_sized_collection_item as the
+    /// collection's update_authority. Same PDA established by
+    /// initialize_collection.
+    /// CHECK: PDA, no data — validated by seeds + bump.
+    #[account(
+        seeds = [b"collection_authority"],
+        bump,
+    )]
+    pub collection_authority: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_metadata_program: Program<'info, Metadata>,
@@ -182,6 +222,11 @@ pub fn handler(ctx: Context<WrapBull>, tier_index: u16) -> Result<()> {
     }
 
     // === 5. Create Metaplex metadata account ===
+    //
+    // collection: Some(...) with verified=false at create time. We then
+    // call verify_sized_collection_item below, which flips verified=true.
+    // (Metaplex requires the unverified→verified transition; you cannot
+    // create metadata as already-verified.)
     {
         let data = DataV2 {
             name: format!("CryptoBulls #{}", tier_index),
@@ -189,7 +234,10 @@ pub fn handler(ctx: Context<WrapBull>, tier_index: u16) -> Result<()> {
             uri: format!("https://cryptobulls.fun/api/metadata/{}", tier_index),
             seller_fee_basis_points: 0,
             creators: None,
-            collection: None,
+            collection: Some(Collection {
+                key: ctx.accounts.collection_mint.key(),
+                verified: false,
+            }),
             uses: None,
         };
         let cpi_accounts = CreateMetadataAccountsV3 {
@@ -234,6 +282,37 @@ pub fn handler(ctx: Context<WrapBull>, tier_index: u16) -> Result<()> {
             signer_seeds,
         );
         metadata::create_master_edition_v3(cpi_ctx, Some(0))?;
+    }
+
+    // === 6.5 Verify the bull's NFT into the Metaplex Certified Collection ===
+    //
+    // Flips this bull's metadata.collection.verified from false → true and
+    // increments collection_details.size on the parent collection NFT.
+    // After this CPI, marketplaces (Tensor / Magic Eden) and wallets
+    // (Phantom) will recognise this NFT as a verified member of the
+    // CryptoBulls collection. Without this step, listings would show
+    // DYOR / "unverified collection" warnings.
+    //
+    // Signed by `collection_authority` PDA, which was set as the
+    // collection metadata's update_authority during initialize_collection.
+    {
+        let coll_auth_bump = ctx.bumps.collection_authority;
+        let coll_signer_seeds: &[&[&[u8]]] = &[&[b"collection_authority", &[coll_auth_bump]]];
+
+        let cpi_accounts = VerifySizedCollectionItem {
+            payer: ctx.accounts.payer.to_account_info(),
+            metadata: ctx.accounts.metadata.to_account_info(),
+            collection_authority: ctx.accounts.collection_authority.to_account_info(),
+            collection_mint: ctx.accounts.collection_mint.to_account_info(),
+            collection_metadata: ctx.accounts.collection_metadata.to_account_info(),
+            collection_master_edition: ctx.accounts.collection_master_edition.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_metadata_program.key(),
+            cpi_accounts,
+            coll_signer_seeds,
+        );
+        metadata::verify_sized_collection_item(cpi_ctx, None)?;
     }
 
     // === 7. Initialize BullAsset record ===
