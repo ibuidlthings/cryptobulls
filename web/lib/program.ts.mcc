@@ -81,6 +81,15 @@ export function masterEditionPda(nftMint: PublicKey): [PublicKey, number] {
   );
 }
 
+// MCC: Metaplex Certified Collection authority is a program PDA so the
+// program signs verify_sized_collection_item on every wrap.
+export function collectionAuthorityPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_authority")],
+    PROGRAM_ID
+  );
+}
+
 export interface WalletLike {
   publicKey: PublicKey;
   signTransaction<T extends Transaction>(tx: T): Promise<T>;
@@ -189,7 +198,8 @@ export async function wrapBull(
   program: Program<Idl>,
   payer: PublicKey,
   tokenMint: PublicKey,
-  tier: number
+  tier: number,
+  collectionMint: PublicKey
 ): Promise<WrapResult> {
   const nftMint = Keypair.generate();
   const [bank] = bankPda();
@@ -200,6 +210,10 @@ export async function wrapBull(
   const payerNftAccount = getAssociatedTokenAddressSync(nftMint.publicKey, payer);
   const [metadata] = metadataPda(nftMint.publicKey);
   const [masterEdition] = masterEditionPda(nftMint.publicKey);
+  // MCC accounts:
+  const [collectionAuthority] = collectionAuthorityPda();
+  const [collectionMetadata] = metadataPda(collectionMint);
+  const [collectionMasterEdition] = masterEditionPda(collectionMint);
 
   const sig = await (program.methods as any)
     .wrapBull(tier)
@@ -215,6 +229,10 @@ export async function wrapBull(
       bullAsset,
       metadata,
       masterEdition,
+      collectionMint,
+      collectionMetadata,
+      collectionMasterEdition,
+      collectionAuthority,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -238,7 +256,8 @@ export async function unwrapBull(
   payer: PublicKey,
   tokenMint: PublicKey,
   tier: number,
-  nftMint: PublicKey
+  nftMint: PublicKey,
+  collectionMint: PublicKey
 ): Promise<UnwrapResult> {
   const [bank] = bankPda();
   const [vaultAuthority] = vaultAuthorityPda(nftMint);
@@ -248,6 +267,9 @@ export async function unwrapBull(
   const payerNftAccount = getAssociatedTokenAddressSync(nftMint, payer);
   const [metadata] = metadataPda(nftMint);
   const [masterEdition] = masterEditionPda(nftMint);
+  // burn_nft on a verified-collection NFT decrements the collection's
+  // size counter, so we must pass the collection mint + metadata.
+  const [collectionMetadata] = metadataPda(collectionMint);
 
   const sig = await (program.methods as any)
     .unwrapBull(tier)
@@ -263,6 +285,8 @@ export async function unwrapBull(
       bullAsset,
       metadata,
       masterEdition,
+      collectionMint,
+      collectionMetadata,
       tokenProgram: TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
     })

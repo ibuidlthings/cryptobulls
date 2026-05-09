@@ -9,6 +9,25 @@ import {
   getProgram,
   unwrapBull,
 } from "@/lib/program";
+
+// Wait for `total_unwrapped` to advance past `target` before continuing.
+// Mirrors waitForBankAdvance for unwraps — protects the post-unwrap refresh
+// from RPC commitment races that would otherwise show the just-unwrapped
+// bull still in the user's list.
+async function waitForUnwrapReflected(
+  program: any,
+  targetTotalUnwrapped: bigint,
+  maxWaitMs = 4000
+) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const b = await fetchBank(program, "processed");
+      if (BigInt(b.totalUnwrapped.toString()) >= targetTotalUnwrapped) return;
+    } catch { /* swallow + retry */ }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
 import { PublicKey } from "@solana/web3.js";
 
 export default function UnwrapPage() {
@@ -46,9 +65,13 @@ export default function UnwrapPage() {
     setStatus(`Unwrapping CryptoBulls #${tier}... please approve in your wallet`);
     try {
       const program = getProgram(connection, wallet as any);
+      const preBank: any = await fetchBank(program, "processed");
+      const preUnwrap = BigInt(preBank.totalUnwrapped.toString());
       const result = await unwrapBull(program, wallet.publicKey, tokenMint, tier, nftMint);
-      setStatus(`✓ Unwrapped CryptoBulls #${tier} - 1,000,000 $BULLS returned. ${result.signature}`);
+      setStatus(`✓ Unwrapped CryptoBulls #${tier} - syncing...`);
+      await waitForUnwrapReflected(program, preUnwrap + 1n);
       await refresh();
+      setStatus(`✓ Unwrapped CryptoBulls #${tier} - 1,000,000 $BULLS returned. ${result.signature}`);
     } catch (e: any) {
       console.error(e);
       setStatus(`✗ ${e.message ?? e}`);

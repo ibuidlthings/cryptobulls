@@ -112,6 +112,28 @@ fi
 echo "program ID:      $PROGRAM_ID (matches Anchor.toml)"
 
 # ============================================================
+# Step 0.5 — Apply MCC web client + rebuild + redeploy web
+# ============================================================
+# Without this, the live website (which currently bundles the pre-MCC
+# IDL) will reject every wrap/unwrap once mainnet runs the MCC program.
+# Idempotent: web_apply_mcc.sh is safe to re-run.
+#
+# Done BEFORE any chain ops so a rebuild failure leaves the chain
+# state untouched.
+echo ""
+echo "=== Step 0.5: apply MCC web client + rebuild + redeploy ==="
+
+if grep -q "collectionAuthorityPda" web/lib/program.ts; then
+  echo "Web client is already MCC-aware. Skipping swap."
+else
+  if [ ! -x scripts/web_apply_mcc.sh ]; then
+    echo "ERROR: scripts/web_apply_mcc.sh missing or not executable."
+    exit 1
+  fi
+  ./scripts/web_apply_mcc.sh
+fi
+
+# ============================================================
 # Step 1 — Deploy program (skip if already deployed at this ID)
 # ============================================================
 echo ""

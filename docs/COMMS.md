@@ -205,15 +205,101 @@ cryptobulls.fun/wrap. Connect your wallet. If you hold ≥1M $BULLS the wrap but
 
 | T+ | Tweet |
 |---|---|
-| 0:00 | Pinned launch tweet (T1) on @CTBullsfun |
-| 0:00 | Quote-RT from your personal handle |
-| 0:05 | Run launch.sh, wait for confirmation |
-| 0:10 | Dev buys on pump.fun |
-| 0:15 | Dev wraps CryptoBulls #1 via website, captures tx |
-| 0:20 | Founder bull tweet (T2) quote-tweeting the wrap tx |
+| -0:30 | Run `launch_preflight.sh`, confirm green |
+| -0:05 | Dev buys $BULLS on pump.fun |
+| 0:00 | Run `launch.sh <BULLS_MINT>` (covers chain + web swap + env flip) |
+| 0:05 | Pinned launch tweet (T1) on @CTBullsfun |
+| 0:05 | Quote-RT from your personal handle |
+| 0:10 | Dev wraps CryptoBulls #1 via website, captures tx |
+| 0:15 | Founder bull tweet (T2) quote-tweeting the wrap tx |
 | 0:30 | Mechanic thread (T3) |
+| 1:00 | Status update tweet (T5) |
 | 1:00+ | Reply hooks (T4) as questions roll in |
-| 24h | Wave 2: re-share the gallery once 10+ bulls are wrapped, with rarity stats |
+| 1-2h | Submit Magic Eden Creator Hub claim |
+| 1-2h | Submit Tensor Creator Portal claim with @CTBullsfun X auth |
+| 24h | T+24h recap tweet (T6) with real numbers from `audit_chain.sh` |
+| 24-72h | Marketplace verified-badge tweet (T7) when ME / Tensor approve |
+
+---
+
+## Tweet 5 — T+1h status (fire ~60 min after launch, organic update)
+
+Once you have a few wraps + maybe one live listing.
+
+### Option A — clean stat
+```
+1 hour in.
+
+N bulls wrapped → live in the gallery
+Y$ in $BULLS locked across all vaults
+First listing live on Tensor: <link>
+
+cryptobulls.fun/gallery
+```
+
+### Option B — UX flex
+```
+Bull #2 just sold on Tensor. The 1,000,000 $BULLS in the vault transferred with the NFT in the same tx.
+
+That's the mechanic. Not a feature, not a hook — the vault's authority is the NFT mint itself.
+
+cryptobulls.fun/bull/2
+```
+
+---
+
+## Tweet 6 — T+24h recap (next-day momentum tweet)
+
+Wait for actual numbers before posting. Replace `N` / `M` / `K` with real values from `/api/health` + `audit_chain.sh`.
+
+### Option A — numbers + thesis
+```
+24 hours of CryptoBulls.
+
+  N / 1000 bulls wrapped
+  M $BULLS locked in vaults
+  K SOL of bull NFT volume on Tensor + Magic Eden
+
+The thesis: a token can also be an NFT, on the standard pump.fun rails, without leaving the launchpad. The chain says yes.
+
+cryptobulls.fun
+```
+
+### Option B — story focused
+```
+Day one: <highest-rarity bull's tier> changed hands K times.
+The vault didn't move once.
+
+Same address holding 1,000,000 $BULLS, three different owners.
+Whoever held the NFT held the right to drain it.
+
+That's why we built it on standard SPL.
+```
+
+### Option C — community shout
+```
+24 hours in, M wraps + K unwraps + Y SOL of marketplace volume.
+
+Big shoutout to everyone who actually read the thesis before clicking wrap. You're the reason this works.
+
+Tomorrow: <next thing — e.g., custom marketplace feature, new trait drop>.
+
+cryptobulls.fun
+```
+
+---
+
+## Tweet 7 — Marketplace verified badge (fire when ME or Tensor approves the Creator Hub claim)
+
+```
+✓ CryptoBulls is now verified on <Magic Eden | Tensor>.
+
+Listings, search, floor price — fully indexed.
+
+Trade here: <marketplace URL>
+```
+
+Plain, factual. The badge does the work.
 
 ---
 

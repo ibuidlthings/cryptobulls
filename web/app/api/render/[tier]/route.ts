@@ -64,7 +64,10 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml; charset=utf-8",
-        "Cache-Control": "public, max-age=60, s-maxage=60",
+        // Visual is deterministic from nft_mint and locked at wrap time.
+        // Cache aggressively (1 day) so marketplace crawlers don't trigger
+        // a re-render every batch.
+        "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
         "Access-Control-Allow-Origin": "*",
         "X-Cache-Source": "in-process",
       },
@@ -76,7 +79,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     status: 200,
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=60, s-maxage=60",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
       "Access-Control-Allow-Origin": "*",
       "X-Cache-Source": "in-process",
     },

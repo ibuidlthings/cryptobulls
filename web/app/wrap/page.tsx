@@ -8,6 +8,7 @@ import {
   fetchUserTokenBalance,
   getProgram,
   wrapBull,
+  waitForBankAdvance,
   TOKENS_PER_BULL_BASE,
   TOKENS_PER_BULL_WHOLE,
 } from "@/lib/program";
@@ -32,8 +33,16 @@ export default function WrapPage() {
       const program = getProgram(connection, wallet as any);
       const bank = await fetchBank(program);
       setTokenMint(bank.tokenMint.toBase58());
-      setNextTier(bank.nextTier);
-      setBullsRemaining(Math.max(0, 1000 - bank.nextTier + 1 + bank.freeTiers.length));
+      // Mirror on-chain pop_tier semantics: free_tiers stack pops LIFO before
+      // we fall back to next_tier. If the website passes a different tier
+      // than the program would pop, wrap_bull reverts with TierMismatch
+      // (Phantom still prompts — failure happens after broadcast).
+      const tierToWrap = bank.freeTiers.length > 0
+        ? bank.freeTiers[bank.freeTiers.length - 1]
+        : bank.nextTier;
+      setNextTier(tierToWrap);
+      // Capacity = 1000 - currently-circulating bulls. Free tiers count as available.
+      setBullsRemaining(Math.max(0, 1000 - bank.inCirculation));
       const bal = await fetchUserTokenBalance(connection, wallet.publicKey, bank.tokenMint);
       setBullsBalance(bal);
     } catch (e: any) {
@@ -56,12 +65,21 @@ export default function WrapPage() {
     try {
       const program = getProgram(connection, wallet as any);
       const tier = nextTier;
+      // Capture pre-wrap totalWrapped so we can confirm the chain advanced
+      // before the next refresh runs. Without this, RPC commitment race can
+      // make refresh() see stale state and the UI re-offers the same tier
+      // — clicking that re-offers fails with custom error 0x0 (PDA in use).
+      const preBank: any = await fetchBank(program, "processed");
+      const preTotal = BigInt(preBank.totalWrapped.toString());
       const { PublicKey } = await import("@solana/web3.js");
       setStatus(`Wrapping CryptoBulls #${tier}... please approve in your wallet`);
       const result = await wrapBull(program, wallet.publicKey, new PublicKey(tokenMint), tier);
-      setStatus(`✓ Wrapped CryptoBulls #${result.tier}`);
+      setStatus(`✓ Wrapped CryptoBulls #${result.tier} - syncing...`);
       setLastResult({ tier: result.tier, nftMint: result.nftMint.toBase58(), sig: result.signature });
+      // Wait for the chain read to reflect the new total before refresh().
+      await waitForBankAdvance(program, preTotal + 1n);
       await refresh();
+      setStatus(`✓ Wrapped CryptoBulls #${result.tier}`);
     } catch (e: any) {
       console.error(e);
       setStatus(`✗ ${e.message ?? e}`);
@@ -127,7 +145,17 @@ export default function WrapPage() {
               {busy ? "Working..." : eligibleWraps < 1 ? "Need 1,000,000 $BULLS to wrap" : bullsRemaining < 1 ? "All bulls are wrapped" : `Wrap CryptoBulls #${nextTier} →`}
             </button>
             {status && (
-              <div className="text-sm text-[var(--bull-dim)] mt-3 break-words">{status}</div>
+              <div
+                className={`text-sm mt-3 break-words rounded-md px-3 py-2 ${
+                  status.startsWith("✗")
+                    ? "bg-[#2a1414] border border-[#5a2828] text-[#ff8a8a]"
+                    : status.startsWith("✓")
+                    ? "bg-[#142a14] border border-[#285a28] text-[#8aff8a]"
+                    : "text-[var(--bull-dim)]"
+                }`}
+              >
+                {status}
+              </div>
             )}
           </div>
 

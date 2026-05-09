@@ -17,10 +17,12 @@ function getOrigin(req: NextRequest): string {
 
 export async function GET(req: NextRequest) {
   const origin = getOrigin(req);
-  // Use the existing mascot as the collection icon (256x256 pixel art bull).
-  // The collection has no per-bull traits — bulls themselves carry the
-  // attributes; this object describes the parent collection.
+  // The collection NFT itself: mascot is the on-chain `image` field
+  // (256x256, used as marketplace tile / wallet thumbnail).
+  // Banner is exposed as a sibling file for marketplaces / Creator Hub
+  // to pick up.
   const image = `${origin}/mascot.png`;
+  const banner = `${origin}/banner.png`;
 
   const metadata = {
     name: "CryptoBulls",
@@ -33,15 +35,25 @@ export async function GET(req: NextRequest) {
       "unwrap any time to redeem the underlying $BULLS.",
     image,
     external_url: origin,
+    // Marketplaces look for a banner via Creator Hub claim (separate
+    // upload) but expose it here so it's discoverable from the on-chain
+    // metadata too.
+    banner_image: banner,
     properties: {
       category: "image",
-      files: [{ uri: image, type: "image/png" }],
+      files: [
+        { uri: image, type: "image/png" },
+        { uri: banner, type: "image/png" },
+      ],
     },
   };
 
   return NextResponse.json(metadata, {
     headers: {
-      "Cache-Control": "public, max-age=300, s-maxage=300",
+      // Collection JSON is mutable in principle (we can update via Metaplex
+      // update_metadata_accounts_v2 if we ever change the description),
+      // so don't mark as immutable. 1h cache is fine.
+      "Cache-Control": "public, max-age=3600, s-maxage=3600",
       "Access-Control-Allow-Origin": "*",
     },
   });

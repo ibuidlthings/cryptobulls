@@ -101,7 +101,11 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
   return NextResponse.json(metadata, {
     headers: {
-      "Cache-Control": "public, max-age=60, s-maxage=60",
+      // Metadata for a wrapped bull is immutable: traits are seeded from
+      // nft_mint and the visual is locked at wrap time. Cache aggressively
+      // so Magic Eden / Tensor crawlers don't hammer our RPC. After unwrap
+      // the URL 404s — marketplaces re-crawl on burn anyway.
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
       "Access-Control-Allow-Origin": "*",
     },
   });

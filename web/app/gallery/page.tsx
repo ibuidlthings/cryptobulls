@@ -5,8 +5,10 @@ export const metadata = {
   title: "Gallery - All wrapped CryptoBulls",
 };
 
+// `force-dynamic` runs the page on every request; `revalidate` would conflict
+// (Next.js prefers revalidate, which would 30s-cache the gallery and make
+// freshly-wrapped bulls take up to 30s to appear).
 export const dynamic = "force-dynamic";
-export const revalidate = 30;
 
 async function loadAllBulls() {
   const conn = getConnection();
@@ -36,16 +38,26 @@ export default async function GalleryPage() {
           <div className="card flex gap-6">
             <Stat label="Live" value={bank.inCirculation} />
             <Stat label="Wrapped lifetime" value={bank.totalWrapped.toString()} />
-            <Stat label="Slots remaining" value={Math.max(0, 1000 - bank.nextTier + 1)} />
+            {/* Capacity = 1000 - in-circulation. Tiers in free_tiers (unwrapped)
+                are reusable, so they count as available, not consumed. */}
+            <Stat label="Slots remaining" value={Math.max(0, 1000 - bank.inCirculation)} />
           </div>
         )}
       </div>
 
       {tiers.length === 0 ? (
         <div className="card text-center py-16">
-          <div className="text-2xl font-bold mb-3">No bulls wrapped yet</div>
-          <p className="text-[var(--bull-dim)] mb-6">Be the first holder to mint a CryptoBull.</p>
-          <Link href="/wrap" className="btn btn-primary">Wrap the first bull →</Link>
+          <div className="text-2xl font-bold mb-3">
+            {bank && bank.totalWrapped > 0n
+              ? "No bulls in circulation right now"
+              : "No bulls wrapped yet"}
+          </div>
+          <p className="text-[var(--bull-dim)] mb-6">
+            {bank && bank.totalWrapped > 0n
+              ? "Every wrapped bull has been unwrapped. Wrap one to bring the herd back."
+              : "Be the first holder to mint a CryptoBull."}
+          </p>
+          <Link href="/wrap" className="btn btn-primary">Wrap a bull →</Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
