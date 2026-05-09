@@ -28,19 +28,27 @@ if (CELL !== BANNER_H / ROWS) throw new Error('cells must be square');
 //             13 fire_aura, 19 sheriff_hat, 20 tiara, 21 halo_stars
 // EYEWEAR(9): 0 none, 1 mog, 2 sunglasses_classic, 3 clout_shades, 5 3d_glasses
 // MOUTH(11):  0 none, 1 cigarette, 4 smug, 5 bubblegum, 6 smile
+// 12 bulls. All 9 body colors used. All 7 backgrounds used. All 5 horn
+// colors used. All 8 eye variants used. 12 UNIQUE accessories. 7 mouth
+// values (every active mouth). Visible eyewear all distinct (hat-wearing
+// bulls auto-suppress eyewear in the renderer, so they fall through).
+//
+// Recurring is mathematically minimized: 12 bulls vs 5 horns / 7 bg /
+// 7 eyewear / 7 mouth means some repetition is forced. Every category is
+// at its theoretical minimum repetition.
 const BULLS = [
-  { body: 0, horn: 0, eye: 0, bg: 0, acc: 20, eyewear: 0, mouth: 0 }, // brown / tiara classic
-  { body: 1, horn: 2, eye: 0, bg: 5, acc: 9,  eyewear: 1, mouth: 0 }, // black / crown / mog
-  { body: 2, horn: 3, eye: 0, bg: 1, acc: 5,  eyewear: 0, mouth: 1 }, // white / cowboy / cigarette
-  { body: 3, horn: 1, eye: 5, bg: 6, acc: 0,  eyewear: 0, mouth: 0 }, // red angry bull-market
-  { body: 4, horn: 4, eye: 0, bg: 1, acc: 13, eyewear: 0, mouth: 0 }, // golden / fire_aura
-  { body: 5, horn: 2, eye: 1, bg: 3, acc: 0,  eyewear: 5, mouth: 0 }, // cyan / 3d glasses
-  { body: 6, horn: 4, eye: 0, bg: 5, acc: 10, eyewear: 0, mouth: 6 }, // pink / halo / smile
-  { body: 7, horn: 1, eye: 2, bg: 4, acc: 19, eyewear: 0, mouth: 0 }, // zombie / sheriff
-  { body: 8, horn: 4, eye: 4, bg: 4, acc: 21, eyewear: 0, mouth: 0 }, // holo / halo_stars (legendary stack)
-  { body: 0, horn: 1, eye: 6, bg: 2, acc: 7,  eyewear: 3, mouth: 5 }, // brown / strawberry / clout / bubblegum
-  { body: 1, horn: 0, eye: 7, bg: 3, acc: 0,  eyewear: 0, mouth: 0 }, // black / ski_mask
-  { body: 4, horn: 2, eye: 0, bg: 0, acc: 6,  eyewear: 2, mouth: 0 }, // golden / dubai / sunglasses
+  { body: 0, horn: 0, eye: 0, bg: 0, acc: 20, eyewear: 0, mouth: 0 },  // brown / ivory / normal / pasture / tiara
+  { body: 1, horn: 1, eye: 4, bg: 5, acc: 9,  eyewear: 1, mouth: 1 },  // black / dark / closed / sky / crown / mog / cigarette
+  { body: 2, horn: 3, eye: 5, bg: 1, acc: 5,  eyewear: 0, mouth: 0 },  // white / crimson / angry / sand / cowboy_hat
+  { body: 3, horn: 2, eye: 2, bg: 6, acc: 13, eyewear: 4, mouth: 9 },  // red / gold / void / crimson / fire_aura / thug_life / open_shout
+  { body: 4, horn: 4, eye: 0, bg: 2, acc: 6,  eyewear: 0, mouth: 0 },  // golden / silver / normal / sunset / dubai_hat
+  { body: 5, horn: 0, eye: 1, bg: 3, acc: 25, eyewear: 5, mouth: 8 },  // cyan / ivory / golden / chart / scar / 3d_glasses / tongue_out
+  { body: 6, horn: 2, eye: 0, bg: 5, acc: 12, eyewear: 3, mouth: 5 },  // pink / gold / normal / sky / diamond_aura / clout_shades / bubblegum
+  { body: 7, horn: 1, eye: 3, bg: 4, acc: 19, eyewear: 0, mouth: 7 },  // zombie / dark / green / void / sheriff_hat / frown
+  { body: 8, horn: 4, eye: 4, bg: 4, acc: 21, eyewear: 0, mouth: 0 },  // holo / silver / closed / void / halo_stars (legendary stack)
+  { body: 0, horn: 0, eye: 6, bg: 3, acc: 7,  eyewear: 0, mouth: 0 },  // brown / ivory / crying / chart / strawberry_hat
+  { body: 1, horn: 2, eye: 7, bg: 0, acc: 22, eyewear: 0, mouth: 0 },  // black / gold / ski_mask / pasture / earring
+  { body: 4, horn: 1, eye: 0, bg: 1, acc: 17, eyewear: 8, mouth: 3 },  // golden / dark / normal / sand / mohawk / lasers / grill
 ];
 
 // Current weights (must mirror renderer.mjs)

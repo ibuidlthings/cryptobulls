@@ -76,7 +76,7 @@ export default async function HomePage() {
               <span className="text-[var(--bull-dim)]">1B SUPPLY</span>
               <span className="text-[var(--bull-accent)]">1M PER BULL</span>
               <span className="text-[var(--bull-dim)]">1000 MAX</span>
-              <span className="text-[var(--bull-accent)]">ERC404 ON SOLANA</span>
+              <span className="text-[var(--bull-accent)]">VAULT FOLLOWS NFT</span>
               <span className="text-[var(--bull-dim)]">PUMP.FUN UPGRADED</span>
               <span className="text-[var(--bull-accent)]">VAULT FOLLOWS NFT</span>
               <span className="text-[var(--bull-dim)]">METAPLEX</span>
@@ -152,9 +152,10 @@ export default async function HomePage() {
               launchpad.
             </p>
             <p className="text-[var(--bull-dim)] text-lg leading-relaxed mb-6">
-              CryptoBulls bridges that gap with an NFT-owned vault PDA wrapper that adds
-              ERC404-style inseparability to any standard SPL token without modifying the token
-              itself. <span className="text-[var(--bull-ink)] font-bold">We extend pump.fun rather than replacing it.</span>
+              CryptoBulls bridges that gap with an NFT-owned vault PDA: each Bull NFT has a
+              vault account whose authority is derived from the NFT's mint pubkey itself. The
+              tokens are bound to the NFT without modifying the underlying SPL token.
+              <span className="text-[var(--bull-ink)] font-bold"> We extend pump.fun rather than replacing it.</span>
             </p>
             <Link href="/about" className="btn btn-secondary">About the project →</Link>
           </div>

@@ -170,7 +170,7 @@ Wrap 1,000,000 $BULLS → a Bull NFT.
 Sell the NFT, the tokens go with it.
 The vault follows the NFT.
 
-1000 supply. 100% on-chain pixel art. ERC-404 mechanics, no Token-2022.
+1000 supply. 100% on-chain pixel art. SPL-404 needed Token-2022. We built it on standard SPL.
 
 cryptobulls.fun
 ```

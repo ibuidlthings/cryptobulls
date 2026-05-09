@@ -7,7 +7,7 @@ import WalletProviders from "./components/WalletProviders";
 export const metadata: Metadata = {
   title: "CryptoBulls - Hybrid token-NFT layer for pump.fun",
   description:
-    "CryptoBulls upgrades pump.fun-launched memecoins with native ERC404-style mechanics. Wrap 1,000,000 $BULLS into a tradeable bull NFT. The vault follows the NFT through every marketplace.",
+    "The first hybrid token-NFT layer for pump.fun-launched memecoins. Wrap 1,000,000 $BULLS into a tradeable bull NFT. The vault follows the NFT through every marketplace transfer.",
   metadataBase: new URL("https://cryptobulls.fun"),
   openGraph: {
     title: "CryptoBulls",

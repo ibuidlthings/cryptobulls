@@ -87,9 +87,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     name: `CryptoBulls #${tier}`,
     symbol: "BULLS",
     description:
-      `CryptoBulls #${tier} - an ERC404-style hybrid bull NFT. Holds 1,000,000 ` +
-      `$BULLS locked in a vault tied to this NFT's mint. Sell the NFT and ` +
-      `the tokens follow it to the buyer.`,
+      `CryptoBulls #${tier} - a hybrid token-NFT. Holds 1,000,000 $BULLS ` +
+      `locked in a vault whose authority is derived from this NFT's mint ` +
+      `address. Sell the NFT, the tokens go with it. Unwrap to redeem.`,
     image: imageUrl,
     external_url: externalUrl,
     attributes,
