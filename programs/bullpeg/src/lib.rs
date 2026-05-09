@@ -28,7 +28,7 @@ pub mod errors;
 use instructions::*;
 
 // Program ID (matches target/deploy/bullpeg-keypair.json on the dev box).
-declare_id!("EaRLH7zU6BCJqJVzL8svMNbXxJbrVGwi4sAwd7NLHzRg");
+declare_id!("A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm");
 
 // ---- Protocol constants ----
 

@@ -488,6 +488,7 @@ describe("bullpeg", () => {
           systemProgram: SystemProgram.programId,
           rent: SYSVAR_RENT_PUBKEY,
         })
+        .preInstructions([CU_BUMP], true)
         .signers([alice, nftMint])
         .rpc();
     }
