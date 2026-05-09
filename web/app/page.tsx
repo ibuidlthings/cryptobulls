@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { fetchBullBank, getConnection, getCluster } from "@/lib/chain";
+import RecentlyWrapped from "./components/RecentlyWrapped";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
@@ -97,6 +98,9 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* RECENTLY WRAPPED (auto-polling client-side; hidden if no wraps) */}
+      <RecentlyWrapped />
 
       {/* FEATURED BULLS */}
       {featuredTiers.length > 0 && (
