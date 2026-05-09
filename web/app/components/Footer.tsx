@@ -33,6 +33,7 @@ export default function Footer() {
           <div className="flex flex-col gap-1">
             <div className="text-[var(--bull-ink)] font-bold text-xs uppercase tracking-wider mb-1">Follow</div>
             <a href="https://x.com/CTBullsfun" target="_blank" rel="noopener" className="hover:text-[var(--bull-accent)]">X / Twitter ↗</a>
+            <a href="https://github.com/ibuidlthings/cryptobulls" target="_blank" rel="noopener" className="hover:text-[var(--bull-accent)]">GitHub ↗</a>
           </div>
         </div>
       </div>
