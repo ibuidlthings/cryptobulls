@@ -1,0 +1,28 @@
+[package]
+name = "bullpeg"
+version = "0.1.0"
+description = "Bullpeg: Solana port of Unipeg's trade-as-mint NFT primitive"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "bullpeg"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+# Anchor 1.0.x is the current stable line, compatible with Solana 3.x and
+# modern Rust. The IDL generator no longer uses the removed
+# `proc_macro2::Span::source_file()` API, and the account-bumps macro emits
+# heap-friendly code (no stack overflow with our 15-account WrapBull).
+anchor-lang = { version = "1.0.2", features = ["init-if-needed"] }
+anchor-spl = { version = "1.0.2", features = ["metadata"] }
+# Metaplex Token Metadata — pinned to the version anchor-spl 1.0.2 requires.
+# (anchor-spl 1.0.2 has a tight dep `mpl-token-metadata = "=5.1.2-alpha.2"`.)
+mpl-token-metadata = "=5.1.2-alpha.2"

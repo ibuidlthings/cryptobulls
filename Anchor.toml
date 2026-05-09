@@ -1,0 +1,32 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+bullpeg = "27QkZH6egmyQ5VsRNAy2SsCzdac4yXDwY8S9TUJCH5wN"
+
+[programs.devnet]
+bullpeg = "A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm"
+
+[programs.mainnet]
+bullpeg = "A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "npm run test"
+
+# Surfpool / local validator — clone the Metaplex Token Metadata program
+# from mainnet at startup so wrap_bull / unwrap_bull CPI calls work locally.
+# Without this, the test validator has no metadata program and CPI calls
+# fail with InvalidProgramExecutable.
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

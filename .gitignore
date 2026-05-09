@@ -1,0 +1,56 @@
+# Anchor / Rust build artifacts
+target/
+**/target/
+Cargo.lock.bak
+
+# Solana keypairs (NEVER commit)
+**/*-keypair.json
+**/wallet-keypair.json
+**/id.json
+*.pem
+
+# Node
+node_modules/
+**/node_modules/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+build/
+
+# Env files (may contain RPC keys)
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+
+# Generated samples (large, regenerable)
+samples/
+!samples/showcase/index.html
+!samples/mascots/index.html
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Anchor IDL/types are committed (consumers need them)
+# but not the deploy keypair
+target/deploy/*-keypair.json
+
+# Logs
+*.log
+deploy.log
+install.log
+
+# Local TypeScript build output
+*.tsbuildinfo
+next-env.d.ts
