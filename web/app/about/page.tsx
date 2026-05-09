@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "About CryptoBulls",
-  description: "What CryptoBulls is, why it exists, and how it bridges pump.fun + ERC-404.",
+  description: "What CryptoBulls is, why it exists, and how it brings hybrid token-NFT mechanics to pump.fun-launched tokens.",
 };
 
 export default function AboutPage() {
@@ -14,21 +14,20 @@ export default function AboutPage() {
         <p className="text-lg text-[var(--bull-dim)] leading-relaxed mb-8">
           CryptoBulls is an upgrade layer for the pump.fun token standard. Pump.fun ships clean,
           bare SPL tokens - bonding curve, graduation, PumpSwap, creator fees. What it doesn't ship
-          is any NFT primitive. CryptoBulls fills that gap with an ERC-404-style hybrid token-NFT
-          layer.
+          is any NFT primitive. CryptoBulls fills that gap.
         </p>
 
         <h2 className="h2 mb-4 mt-12">The problem</h2>
         <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
-          On Ethereum, ERC-404 (Pandora was first) made hybrid tokens famous: hold the fungible,
-          earn the NFT; sell the NFT, lose the fungible. They trade together because they're
-          inseparable at the protocol level.
+          The standard hybrid token-NFT mechanic on Solana, SPL-404 (used by Mutantmon, Mall
+          Street, Flyffys), requires Token-2022 - the newer Solana token standard with transfer
+          hooks. Pump.fun launches classic SPL tokens (the older, hookless standard). The two are
+          not interoperable. To use SPL-404 you have to abandon pump.fun's launchpad culture
+          entirely.
         </p>
         <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
-          On Solana, SPL-404 (Mutantmon, Mall Street, Flyffys) did the same - but using
-          Token-2022, the newer Solana token standard with transfer hooks. Pump.fun launches
-          classic SPL tokens (the older, hookless standard). The two are not interoperable. To use
-          SPL-404 you have to abandon pump.fun's launchpad culture entirely.
+          So the obvious question: can you bind a token to an NFT on standard SPL, without
+          modifying the token, on the launchpad people actually use?
         </p>
 
         <h2 className="h2 mb-4 mt-12">Our answer</h2>
@@ -38,12 +37,20 @@ export default function AboutPage() {
         </p>
         <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
           Result: when an NFT trades on Magic Eden or Tensor, the locked tokens follow it atomically.
-          Buy the NFT → you control the vault. Sell the NFT → the buyer controls it. ERC-404 style
-          inseparability without modifying the underlying token.
+          Buy the NFT → you control the vault. Sell the NFT → the buyer controls it. The token
+          stays standard SPL the whole time.
         </p>
         <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
           The wrap is voluntary, on-chain, audited by code, and reversible. We extend pump.fun
           rather than replacing it.
+        </p>
+
+        <h2 className="h2 mb-4 mt-12">Peer reference</h2>
+        <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
+          uPeg uses Uniswap v4 hooks to bind a token to a generative NFT on Ethereum.
+          CryptoBulls uses Solana PDAs to bind a token to a separately-tradeable NFT on
+          pump.fun. Different problems, same instinct: use a chain primitive instead of a
+          hybrid token standard.
         </p>
 
         <h2 className="h2 mb-4 mt-12">What we add on top</h2>

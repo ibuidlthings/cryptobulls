@@ -3,7 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Thesis - CryptoBulls",
   description:
-    "A new kind of pump.fun token. The first hybrid token-NFT layer for standard SPL launches.",
+    "The first hybrid token-NFT layer for pump.fun-launched memecoins. Built on standard SPL using an NFT-owned vault PDA, where SPL-404 doesn't work.",
 };
 
 export default function ThesisPage() {
@@ -14,43 +14,55 @@ export default function ThesisPage() {
           The thesis
         </div>
         <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-0">
-          A new kind of pump.fun token. Not a vanilla memecoin. Not a side NFT
-          drop. The first hybrid token-NFT layer for standard SPL launches.
+          A token that is also an NFT. Tradeable on pump.fun and on every
+          Solana NFT marketplace at the same time. Built where nobody else
+          had built it.
         </h1>
       </header>
 
       <Section n="01">
-        When pump.fun took over Solana memecoin culture, one detail stood out:
-        it ships standard SPL tokens. No transfer hooks. No Token-2022. The
-        "obvious" hybrid token-NFT mechanic on Solana, SPL-404, requires
-        Token-2022 and is therefore incompatible with pump.fun. Every existing
-        hybrid project had to abandon the launchpad. CryptoBulls is what
-        happens when you don't.
+        Pump.fun ships clean, bare SPL tokens. Bonding curve, graduation to
+        PumpSwap, creator fees. What it doesn't ship is any NFT primitive.
+        The hybrid token-NFT mechanic on Solana &mdash; SPL-404 &mdash;
+        requires Token-2022, which is incompatible with the classic SPL
+        tokens pump.fun launches. Every existing hybrid project had to
+        leave the launchpad to work. The constraint nobody had solved: how
+        do you bind a token to an NFT without modifying the token?
       </Section>
 
       <Section n="02">
-        $BULLS uses an NFT-owned vault PDA to bind exactly 1,000,000 tokens
-        to each Bull NFT. The vault's authority is derived from the NFT mint
-        address itself: <code className="text-[var(--bull-accent)]">PDA(["vault", nft_mint])</code>.
-        When the NFT trades on Magic Eden or Tensor, the vault doesn't
-        physically move. What changes is who can drive the program to drain
-        it. Possession of the NFT is possession of the right to redeem the
-        tokens.
+        CryptoBulls solves it with an NFT-owned vault PDA. Each Bull NFT
+        has a vault token account whose authority is derived from the
+        NFT's mint pubkey itself:{" "}
+        <code className="text-[var(--bull-accent)]">PDA(["vault", nft_mint])</code>.
+        The vault has no private key anywhere. The only way to sign for it
+        is through this program, which gates signing on the caller holding
+        1 of <code className="text-[var(--bull-accent)]">nft_mint</code>.
       </Section>
 
       <Section n="03">
-        The visual is hashed from the NFT mint pubkey and rendered on-chain.
-        No IPFS. No external storage. No metadata server failure mode. The
-        24×24 pixel art is reproducible from chain state alone. Every wrap
-        creates a new visual; every unwrap frees the tier; every re-wrap
-        re-rolls.
+        When the NFT trades on Magic Eden or Tensor, the vault doesn't
+        physically move. The address is unchanged. The authority is
+        unchanged. What changes is who can drive the program to drain it.
+        Possession of the NFT is possession of the right to redeem the
+        tokens. The underlying SPL token never had to be modified. The
+        launchpad never had to be replaced.
       </Section>
 
       <Section n="04">
-        The name: ERC-404 made hybrid tokens famous on Ethereum. SPL-404
-        brought the mechanic to Solana, but only on Token-2022. CryptoBulls
-        is the version that works on the standard token pump.fun actually
-        ships.
+        The result: the first hybrid token-NFT layer that works on
+        pump.fun-launched memecoins. 1,000 max supply. 1,000,000 $BULLS
+        per bull. 100% on-chain pixel art. Same launchpad you already use,
+        same PumpSwap graduation, same wallet UX &mdash; with a native NFT
+        primitive on top of the standard token.
+      </Section>
+
+      <Section n="05">
+        uPeg uses Uniswap v4 hooks to bind a token to a generative NFT on
+        Ethereum. CryptoBulls uses Solana PDAs to bind a token to a
+        separately-tradeable NFT on pump.fun. Different problems, same
+        instinct: use a chain primitive instead of a hybrid token
+        standard.
       </Section>
 
       <div className="mt-24 text-center">
@@ -60,7 +72,8 @@ export default function ThesisPage() {
           <span style={{ color: "var(--bull-accent)" }}>CryptoBulls</span>
         </div>
         <p className="text-[var(--bull-dim)] italic">
-          The mechanic that nobody knew could work on pump.fun, working on pump.fun.
+          A token that is also an NFT. Built on the launchpad where nobody
+          else could build it.
         </p>
       </div>
 

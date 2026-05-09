@@ -8,19 +8,46 @@ Three pieces, fired in sequence. Each draft is under Twitter's 280-char limit.
 
 **Attach: `samples/banners/banner_1500x500.png`**
 
+### Option A — leads with what we solved (recommended)
 ```
 Introducing CryptoBulls 🐂
 
-The first hybrid token-NFT layer for pump.fun.
+The first hybrid token-NFT layer for pump.fun-launched memecoins.
 
-Wrap 1,000,000 $BULLS → a Bull NFT.
+Wrap 1,000,000 $BULLS into a Bull NFT.
 Sell the NFT, the tokens go with it.
 The vault follows the NFT.
 
-1000 supply. 100% on-chain pixel art. ERC-404 mechanics, no Token-2022.
+SPL-404 needed Token-2022. We built it on standard SPL.
 
 cryptobulls.fun
 ```
+
+### Option B — punchier
+```
+A pump.fun token that is also an NFT. 🐂
+
+Wrap 1M $BULLS → a Bull NFT.
+Trade the NFT on Magic Eden or Tensor — the tokens follow.
+Unwrap to redeem.
+
+1000 supply. 100% on-chain pixel art. Built where nobody else could.
+
+cryptobulls.fun
+```
+
+### Option C — confidence flex
+```
+The mechanic everyone said couldn't work on pump.fun — working on pump.fun. 🐂
+
+CryptoBulls: wrap 1,000,000 $BULLS into an NFT. The vault follows the NFT through every transfer. No Token-2022 required.
+
+1000 supply.
+
+cryptobulls.fun
+```
+
+**Recommendation: Option A.** Tells you exactly what it is and what was hard about it. The line "SPL-404 needed Token-2022. We built it on standard SPL." is the meme that should travel — it's the actual differentiator, accurate, and sets up "but how?" curiosity that pulls people into the thesis page.
 
 Pin this on @CTBullsfun. Quote-RT from your personal account.
 
@@ -82,51 +109,50 @@ Quote-RT from @CTBullsfun. 5 tweets.
 ```
 A short thread on how CryptoBulls works.
 
-ERC-404 brought hybrid token-NFT mechanics to Ethereum.
-SPL-404 brought them to Solana — but only on Token-2022.
-
-pump.fun launches standard SPL tokens, no transfer hooks. Every existing hybrid had to abandon the launchpad.
+The constraint: pump.fun ships standard SPL tokens, no transfer hooks. SPL-404 — the standard hybrid token-NFT mechanic on Solana — requires Token-2022, which is incompatible. Every existing hybrid project had to leave the launchpad.
 
 We didn't. 🐂
 ```
 
 ### 2/5
 ```
-The trick: an NFT-owned vault PDA.
+The mechanism: an NFT-owned vault PDA.
 
-When you wrap 1M $BULLS, the program creates a vault account whose authority is derived from the NFT's mint address itself.
+When you wrap 1M $BULLS, the program creates a vault token account whose authority is derived from the NFT's mint pubkey itself.
 
-vault_authority = PDA(["vault", nft_mint])
+  vault_authority = PDA(["vault", nft_mint])
 
-Pure function. No keypair. Only this program can sign.
+Pure function. No keypair exists. Only this program can sign for it.
 ```
 
 ### 3/5
 ```
-So when the NFT trades on Magic Eden or Tensor, the vault doesn't physically move. Same address, same authority.
+When the NFT trades on Magic Eden or Tensor, the vault doesn't physically move. Same address. Same authority.
 
 What changes is who can drive the program to drain it.
 
-Possession of the NFT is possession of the right to call unwrap_bull. Possession of the right is possession of the tokens.
+Possession of the NFT is possession of the right to call unwrap_bull. Authority follows the asset, atomically, no transfer hook needed.
 ```
 
 ### 4/5
 ```
-1,000 max supply. 1B $BULLS. 1M tokens per bull. 100% on-chain pixel art seeded from the NFT's mint pubkey.
+The underlying SPL token never had to be modified. The launchpad never had to be replaced.
 
-Same launchpad. Same PumpSwap graduation. Same wallet UX. Native NFT primitive on top.
+That's why this works on pump.fun where SPL-404 doesn't.
 
-We extend pump.fun. We don't replace it.
+Same bonding curve, same PumpSwap graduation, same wallet UX — with a native NFT primitive on top of the standard token.
 ```
 
 ### 5/5
 ```
-Read the full thesis: cryptobulls.fun/thesis
-Audit the program: github.com/ibuidlthings/cryptobulls
+1,000 supply. 1M $BULLS per bull. 100% on-chain pixel art seeded from each NFT's mint pubkey.
 
-Wrap a bull. Sell it. Or unwrap. Your bull. Your vault.
+Read the thesis: cryptobulls.fun/thesis
+Audit: github.com/ibuidlthings/cryptobulls
 
-Open app: cryptobulls.fun
+Wrap. Trade. Unwrap.
+
+cryptobulls.fun
 ```
 
 ---
@@ -137,9 +163,16 @@ When people ask predictable questions, fire one of these:
 
 **"how is this different from SPL-404?"**
 ```
-SPL-404 requires Token-2022. pump.fun ships standard SPL. Token-2022 ≠ standard SPL — they're different token programs entirely. Existing hybrid projects had to launch outside pump.fun.
+SPL-404 requires Token-2022 transfer hooks. pump.fun ships standard SPL — no hooks. Different token programs entirely. SPL-404 forces you off the launchpad.
 
-We built it on standard SPL using an NFT-owned vault PDA pattern. Works with any pump.fun token.
+We derive the vault's authority from the NFT mint pubkey via a PDA. No transfer hook needed. Works on standard SPL, which is what pump.fun ships.
+```
+
+**"how does this compare to uPeg?"**
+```
+uPeg uses Uniswap v4 hooks to bind a token to a generative NFT on Ethereum. CryptoBulls uses Solana PDAs to bind a token to a separately-tradeable NFT on pump.fun.
+
+Different problems, same instinct: use a chain primitive instead of a hybrid token standard.
 ```
 
 **"what stops you from rugging the vaults?"**

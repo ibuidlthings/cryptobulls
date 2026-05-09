@@ -10,18 +10,26 @@ The first hybrid token-NFT layer for pump.fun-launched memecoins.
 
 ## Why
 
-ERC-404 made hybrid tokens famous on Ethereum. SPL-404 brought the mechanic to
-Solana, but only on Token-2022. **pump.fun ships standard SPL tokens** with no
-transfer hooks — every existing hybrid project had to abandon the launchpad to
-work. CryptoBulls is the version that works on the standard token pump.fun
-actually ships.
+Pump.fun ships clean, bare SPL tokens — bonding curve, graduation to PumpSwap,
+creator fees. What it doesn't ship is any NFT primitive. The standard hybrid
+token-NFT mechanic on Solana, **SPL-404**, requires Token-2022 transfer hooks
+and is therefore incompatible with pump.fun's classic SPL launches. Every
+existing hybrid project had to abandon the launchpad to work.
+
+CryptoBulls is the first hybrid token-NFT layer that works on pump.fun.
 
 The mechanism: an **NFT-owned vault PDA**. Each Bull NFT has a vault account
 holding 1,000,000 $BULLS, with the vault's authority derived from the NFT mint
 itself (`PDA(["vault", nft_mint])`). When the NFT trades on Magic Eden or
-Tensor, the vault's address doesn't move — what changes is who can drive the
-program to drain it. Possession of the NFT is possession of the right to
-redeem the tokens.
+Tensor, the vault's address doesn't physically move — what changes is who can
+drive the program to drain it. Possession of the NFT is possession of the
+right to redeem the tokens. The underlying SPL token never had to be modified.
+The launchpad never had to be replaced.
+
+**Peer reference:** uPeg uses Uniswap v4 hooks to bind a token to a generative
+NFT on Ethereum. CryptoBulls uses Solana PDAs to bind a token to a
+separately-tradeable NFT on pump.fun. Different problems, same instinct: use a
+chain primitive instead of a hybrid token standard.
 
 Full thesis: [cryptobulls.fun/thesis](https://cryptobulls.fun/thesis).
 Tech walkthrough: [TECH_WALKTHROUGH.md](TECH_WALKTHROUGH.md).
