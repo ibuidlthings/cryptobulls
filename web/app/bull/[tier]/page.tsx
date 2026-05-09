@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { fetchBullAsset, getConnection, getCluster } from "@/lib/chain";
+import { fetchBullAsset, getConnection, getCluster, getProgramId } from "@/lib/chain";
 import { selectTraits, deriveSeed } from "@/lib/renderer.mjs";
 import { notFound } from "next/navigation";
+import ShareButtons from "@/app/components/ShareButtons";
+import { getRarityForTier } from "@/lib/rarity";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
@@ -46,6 +48,7 @@ export default async function BullPage({ params }: BullPageContext) {
   const seed = deriveSeed(bull.nftMint.toBase58());
   const traits = selectTraits(seed) as Record<string, number>;
   const cluster = getCluster();
+  const rarity = await getRarityForTier(conn, getProgramId(), tier);
 
   const wrappedAt = new Date(bull.wrappedAt * 1000);
   const explorerCluster = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
@@ -73,16 +76,28 @@ export default async function BullPage({ params }: BullPageContext) {
             vault tied to this NFT's mint. Sell the NFT and the tokens follow it to the buyer.
           </div>
 
+          {rarity && rarity.total >= 1 && (
+            <div className="card mb-4">
+              <div className="flex items-baseline justify-between mb-2">
+                <div className="text-xs uppercase tracking-wider text-[var(--bull-dim)]">Rarity</div>
+                <div className="text-xs text-[var(--bull-dim)]">across {rarity.total} bulls</div>
+              </div>
+              <div className="text-3xl font-extrabold text-[var(--bull-accent)]">
+                Rank #{rarity.rank} <span className="text-base font-normal text-[var(--bull-dim)]">/ {rarity.total}</span>
+              </div>
+            </div>
+          )}
+
           <div className="card mb-4">
             <div className="text-xs uppercase tracking-wider text-[var(--bull-dim)] mb-3">Traits</div>
             <div className="grid grid-cols-2 gap-3">
-              <Trait label="Body" value={TRAIT_LABELS.body[traits.body]} />
-              <Trait label="Horn" value={TRAIT_LABELS.horn[traits.horn]} />
-              <Trait label="Eye" value={TRAIT_LABELS.eye[traits.eye]} />
-              <Trait label="Background" value={TRAIT_LABELS.bg[traits.bg]} />
-              <Trait label="Accessory" value={TRAIT_LABELS.acc[traits.acc]} />
-              <Trait label="Eyewear" value={TRAIT_LABELS.eyewear[traits.eyewear]} />
-              <Trait label="Mouth" value={TRAIT_LABELS.mouth[traits.mouth]} />
+              <Trait label="Body" value={TRAIT_LABELS.body[traits.body]} pct={rarity?.perTrait.body.pct} />
+              <Trait label="Horn" value={TRAIT_LABELS.horn[traits.horn]} pct={rarity?.perTrait.horn.pct} />
+              <Trait label="Eye" value={TRAIT_LABELS.eye[traits.eye]} pct={rarity?.perTrait.eye.pct} />
+              <Trait label="Background" value={TRAIT_LABELS.bg[traits.bg]} pct={rarity?.perTrait.bg.pct} />
+              <Trait label="Accessory" value={TRAIT_LABELS.acc[traits.acc]} pct={rarity?.perTrait.acc.pct} />
+              <Trait label="Eyewear" value={TRAIT_LABELS.eyewear[traits.eyewear]} pct={rarity?.perTrait.eyewear.pct} />
+              <Trait label="Mouth" value={TRAIT_LABELS.mouth[traits.mouth]} pct={rarity?.perTrait.mouth.pct} />
             </div>
           </div>
 
@@ -94,6 +109,7 @@ export default async function BullPage({ params }: BullPageContext) {
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            <ShareButtons tier={tier} bodyName={TRAIT_LABELS.body[traits.body]} />
             <a
               href={`https://explorer.solana.com/address/${bull.nftMint.toBase58()}${explorerCluster}`}
               target="_blank"
@@ -129,10 +145,17 @@ export default async function BullPage({ params }: BullPageContext) {
   );
 }
 
-function Trait({ label, value }: { label: string; value: string }) {
+function Trait({ label, value, pct }: { label: string; value: string; pct?: number }) {
   return (
     <div className="bg-[#0e0e12] rounded-md p-3">
-      <div className="text-[10px] uppercase tracking-wider text-[var(--bull-dim)]">{label}</div>
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-[10px] uppercase tracking-wider text-[var(--bull-dim)]">{label}</div>
+        {pct !== undefined && (
+          <div className="text-[10px] text-[var(--bull-dim)]" title={`${pct.toFixed(1)}% of bulls have this ${label.toLowerCase()}`}>
+            {pct.toFixed(1)}%
+          </div>
+        )}
+      </div>
       <div className="font-bold text-[var(--bull-accent)] truncate">{value}</div>
     </div>
   );
