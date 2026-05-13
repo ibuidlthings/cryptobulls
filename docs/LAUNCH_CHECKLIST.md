@@ -5,9 +5,23 @@ Single source of truth for everything that has to be true before we run
 
 ## Phase 0 — Pending external approvals
 
-- [x] Submit Phantom dApp review form (Google form, 2026-05-09)
-- [ ] **Phantom whitelist confirmation received** (24–72h, by email or in-app)
-  — until this resolves, mainnet wallet connect shows "Request blocked"
+- [x] Submit Phantom dApp review form (Google form, 2026-05-09 12:58 PT)
+- [ ] **Phantom whitelist confirmation received** (24–72h window;
+  72h mark = 2026-05-12 ~1pm PT). Until this resolves, mainnet wrap +
+  unwrap tx-sign prompts show "Request blocked - This dApp could be
+  malicious" with a "Proceed anyway (unsafe)" option.
+  - 2026-05-11 morning: wallet-connect on fresh mobile Phantom passed
+    cleanly (no banner on connect prompt).
+  - 2026-05-11 afternoon: wrap tx-sign on desktop Phantom (deployer
+    wallet, devnet) STILL shows the red banner. The Blowfish tx-level
+    check has not cleared yet.
+  - Conclusion: connect layer may be partially cleared; tx-sign layer
+    is not. Wait for full clear OR plan to launch with the warning
+    showing (power users can hit "Proceed anyway").
+
+### Backup posture (done 2026-05-11)
+- [x] Mainnet deployer keypair backed up
+- [x] DigitalOcean weekly snapshots enabled (Sundays)
 
 ## Phase 1 — Trust signals on the live site (done 2026-05-09)
 

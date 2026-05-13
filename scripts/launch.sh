@@ -206,6 +206,26 @@ if grep -q "NEXT_PUBLIC_SOLANA_CLUSTER=devnet" "$UNIT"; then
   sed -i "s|^Environment=NEXT_PUBLIC_SOLANA_CLUSTER=.*|Environment=NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta|" "$UNIT"
   sed -i "s|^Environment=NEXT_PUBLIC_SOLANA_RPC_URL=.*|Environment=NEXT_PUBLIC_SOLANA_RPC_URL=$NEW_PUB|" "$UNIT"
   sed -i "s|^Environment=SOLANA_RPC_URL=.*|Environment=SOLANA_RPC_URL=$NEW_SRV|" "$UNIT"
+  # Flip launch state to "live" + set the $BULLS mint so the public site
+  # shows live stats + the contract address pill.
+  sed -i "s|^Environment=NEXT_PUBLIC_LAUNCH_STATE=.*|Environment=NEXT_PUBLIC_LAUNCH_STATE=live|" "$UNIT"
+  sed -i "s|^Environment=NEXT_PUBLIC_TOKEN_MINT=.*|Environment=NEXT_PUBLIC_TOKEN_MINT=$BULLS_MINT|" "$UNIT"
+  # Same envs need to be baked into the Next.js bundle at build time (Next
+  # inlines NEXT_PUBLIC_* at build, not request time). Rebuild + sync.
+  echo "Rebuilding web with launch envs..."
+  cd /root/bullpeg-sol/web
+  NEXT_PUBLIC_PROGRAM_ID="$PROGRAM_ID" \
+  NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta \
+  NEXT_PUBLIC_SOLANA_RPC_URL="$NEW_PUB" \
+  NEXT_PUBLIC_LAUNCH_STATE=live \
+  NEXT_PUBLIC_TOKEN_MINT="$BULLS_MINT" \
+    npm run build
+  rm -rf /opt/cryptobulls-web/.next/static /opt/cryptobulls-web/public
+  mkdir -p /opt/cryptobulls-web/.next/static /opt/cryptobulls-web/public
+  cp -r .next/standalone/. /opt/cryptobulls-web/
+  cp -r .next/static/. /opt/cryptobulls-web/.next/static/
+  cp -r public/. /opt/cryptobulls-web/public/
+  cd /root/bullpeg-sol
   systemctl daemon-reload
   systemctl restart cryptobulls-web
   sleep 4
