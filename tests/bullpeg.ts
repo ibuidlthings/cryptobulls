@@ -761,4 +761,233 @@ describe("bullpeg", () => {
     expect(bank.inCirculation).to.equal(3);
     expect(bank.nextTier).to.equal(4);
   });
+
+  // ==================================================================
+  // === ADVERSARIAL TESTS — vault security invariants =================
+  // ==================================================================
+  //
+  // The central security invariant for this program is:
+  //   "Only whoever holds the NFT can drain its vault."
+  //
+  // The three tests below empirically prove each piece of that
+  // invariant by constructing an attack and asserting the program
+  // rejects it. After "wraps multiple bulls" Alice owns tiers 1, 2, 3.
+  // None of the attacks below should change any on-chain state — they
+  // must revert atomically.
+
+  it("SECURITY: non-holder cannot unwrap (NotNftHolder)", async () => {
+    // Attack: Bob (who does NOT hold tier 1's NFT) tries to unwrap
+    // Alice's tier 1 bull. Expected: program rejects with NotNftHolder.
+    const tierIndex = 1;
+    const tierBuf = Buffer.alloc(2);
+    tierBuf.writeUInt16LE(tierIndex);
+    const [bullAssetPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("bull"), tierBuf],
+      program.programId,
+    );
+    const bullAssetAccount = await program.account.bullAsset.fetch(bullAssetPda);
+    const nftMint = bullAssetAccount.nftMint;
+
+    // Initialise Bob's NFT ATA so it exists but has 0 balance — this
+    // lets the constraint check reach the `amount == 1` step rather
+    // than tripping on AccountNotInitialized (still a fail-closed
+    // outcome, but we want to verify the explicit NotNftHolder error).
+    await getOrCreateAssociatedTokenAccount(connection, bob, nftMint, bob.publicKey);
+
+    // Derive PDAs as if Bob were the rightful payer.
+    const pdas = deriveWrapPdas(
+      program.programId, tierIndex, nftMint, tokenMint, bob.publicKey,
+    );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
+
+    // Capture vault balance pre-attack so we can prove no tokens moved.
+    const vaultBefore = (await getAccount(connection, pdas.vault)).amount;
+
+    let errored = false;
+    try {
+      await program.methods
+        .unwrapBull(tierIndex)
+        .accounts({
+          bank: bankPda,
+          payer: bob.publicKey,
+          payerTokenAccount: bobTokenAccount,
+          tokenMint,
+          nftMint,
+          nftMintAuthority: pdas.vaultAuthority,
+          vault: pdas.vault,
+          payerNftAccount: pdas.payerNftAccount,
+          bullAsset: pdas.bullAsset,
+          metadata: pdas.metadata,
+          masterEdition: pdas.masterEdition,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: collPdas.collectionMetadata,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        })
+        .preInstructions([CU_BUMP], true)
+        .signers([bob])
+        .rpc();
+    } catch (e: any) {
+      errored = true;
+      expect(e.toString()).to.include("NotNftHolder");
+    }
+    expect(errored, "unwrap by non-holder must revert").to.equal(true);
+
+    // Atomicity proof: vault balance is exactly what it was before.
+    const vaultAfter = (await getAccount(connection, pdas.vault)).amount;
+    expect(vaultAfter).to.equal(vaultBefore);
+    expect(vaultAfter).to.equal(TOKENS_PER_BULL);
+  });
+
+  it("SECURITY: cannot unwrap with mismatched nft_mint (NftMintMismatch)", async () => {
+    // Attack: Alice owns tier 1 AND tier 2. She tries to unwrap tier 1's
+    // bull_asset PDA but passes tier 2's nft_mint (and all derived
+    // accounts) instead. If the program didn't link bull_asset.nft_mint
+    // to the nft_mint argument, an attacker could decouple the on-chain
+    // record from the actual NFT and unwrap a vault they don't control.
+    // Expected: program rejects with NftMintMismatch.
+    const tier1 = 1;
+    const tier2 = 2;
+    const tier2Buf = Buffer.alloc(2);
+    tier2Buf.writeUInt16LE(tier2);
+    const [tier2BullAssetPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("bull"), tier2Buf],
+      program.programId,
+    );
+    const tier2BullAsset = await program.account.bullAsset.fetch(tier2BullAssetPda);
+    const tier2NftMint = tier2BullAsset.nftMint;
+
+    // Derive vault/auth/payer_nft for tier 2's nft_mint (so account
+    // validation passes everywhere EXCEPT the nft_mint <-> bull_asset
+    // link check).
+    const pdas = deriveWrapPdas(
+      program.programId, tier1, tier2NftMint, tokenMint, alice.publicKey,
+    );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
+
+    // Capture both vaults' balances — neither should change.
+    const tier2Vault = pdas.vault;
+    const tier2VaultBefore = (await getAccount(connection, tier2Vault)).amount;
+
+    let errored = false;
+    try {
+      await program.methods
+        .unwrapBull(tier1)
+        .accounts({
+          bank: bankPda,
+          payer: alice.publicKey,
+          payerTokenAccount: aliceTokenAccount,
+          tokenMint,
+          nftMint: tier2NftMint, // <-- wrong nft_mint for tier 1
+          nftMintAuthority: pdas.vaultAuthority,
+          vault: pdas.vault,
+          payerNftAccount: pdas.payerNftAccount,
+          bullAsset: pdas.bullAsset, // <-- tier 1's bull_asset
+          metadata: pdas.metadata,
+          masterEdition: pdas.masterEdition,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: collPdas.collectionMetadata,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        })
+        .preInstructions([CU_BUMP], true)
+        .signers([alice])
+        .rpc();
+    } catch (e: any) {
+      errored = true;
+      expect(e.toString()).to.include("NftMintMismatch");
+    }
+    expect(errored, "unwrap with mismatched nft_mint must revert").to.equal(true);
+
+    // Atomicity proof: tier 2's vault still holds 1M $TOKEN.
+    const tier2VaultAfter = (await getAccount(connection, tier2Vault)).amount;
+    expect(tier2VaultAfter).to.equal(tier2VaultBefore);
+    expect(tier2VaultAfter).to.equal(TOKENS_PER_BULL);
+  });
+
+  it("SECURITY: cannot wrap with a different SPL mint (WrongMint)", async () => {
+    // Attack: an attacker creates their own SPL token (anyone can) and
+    // tries to wrap_bull using that token's ATA instead of the bank's
+    // locked $TOKEN mint. If the program didn't pin payer_token_account.mint
+    // to bank.token_mint, they could mint a free Bull NFT by locking
+    // worthless tokens. Expected: program rejects with WrongMint.
+    const tierIndex = 4; // next available — none of 1/2/3 is free
+    const bankBefore: any = await program.account.bullBank.fetch(bankPda);
+
+    // Create a different SPL mint (the "worthless" attacker token).
+    const wrongMint = await createMint(
+      connection, alice, alice.publicKey, null, TOKEN_DECIMALS,
+    );
+    const wrongMintAta = await getOrCreateAssociatedTokenAccount(
+      connection, alice, wrongMint, alice.publicKey,
+    );
+    // Give Alice >=1M of the wrong token so she'd pass the balance
+    // check if the program failed to enforce the mint.
+    await mintTo(
+      connection, alice, wrongMint, wrongMintAta.address, alice,
+      5n * TOKENS_PER_BULL,
+    );
+
+    const nftMintPk = deriveNftMint(
+      program.programId,
+      BigInt(bankBefore.totalWrapped.toString()),
+    );
+    const pdas = deriveWrapPdas(
+      program.programId, tierIndex, nftMintPk, tokenMint, alice.publicKey,
+    );
+    const collPdas = deriveCollectionPdas(
+      program.programId, collectionMint.publicKey, alice.publicKey,
+    );
+
+    let errored = false;
+    try {
+      await program.methods
+        .wrapBull(tierIndex)
+        .accounts({
+          bank: bankPda,
+          payer: alice.publicKey,
+          payerTokenAccount: wrongMintAta.address, // <-- wrong mint's ATA
+          tokenMint, // <-- still pointing at the bank's locked mint
+          nftMint: nftMintPk,
+          nftMintAuthority: pdas.vaultAuthority,
+          vault: pdas.vault,
+          payerNftAccount: pdas.payerNftAccount,
+          bullAsset: pdas.bullAsset,
+          metadata: pdas.metadata,
+          masterEdition: pdas.masterEdition,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: collPdas.collectionMetadata,
+          collectionMasterEdition: collPdas.collectionMasterEdition,
+          collectionAuthority: collPdas.collectionAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+          rent: SYSVAR_RENT_PUBKEY,
+        })
+        .preInstructions([CU_BUMP], true)
+        .signers([alice])
+        .rpc();
+    } catch (e: any) {
+      errored = true;
+      // Anchor may raise the explicit WrongMint or a generic constraint
+      // failure depending on which constraint fires first; either is
+      // a fail-closed outcome.
+      const msg = e.toString();
+      expect(
+        msg.includes("WrongMint") || msg.includes("ConstraintRaw") || msg.includes("AnchorError"),
+        `expected mint-mismatch rejection, got: ${msg}`,
+      ).to.equal(true);
+    }
+    expect(errored, "wrap with wrong SPL mint must revert").to.equal(true);
+
+    // Bank counters unchanged — no bull was minted.
+    const bankAfter: any = await program.account.bullBank.fetch(bankPda);
+    expect(bankAfter.totalWrapped.toString()).to.equal(bankBefore.totalWrapped.toString());
+    expect(bankAfter.inCirculation).to.equal(bankBefore.inCirculation);
+  });
 });
