@@ -7,11 +7,33 @@ import {
   fetchBank,
   fetchUserOwnedBulls,
   getProgram,
+  SimulationError,
   unwrapBull,
 } from "@/lib/program";
 
+const PRE_LAUNCH = process.env.NEXT_PUBLIC_LAUNCH_STATE === "pre-launch";
+
+function PreLaunchCard() {
+  return (
+    <div className="card text-center py-12">
+      <div className="text-xs uppercase tracking-[0.25em] text-[var(--bull-dim)] mb-3">
+        Pre-launch
+      </div>
+      <div className="text-2xl font-bold mb-3">Unwrap goes live at launch</div>
+      <p className="text-[var(--bull-dim)] mb-6 max-w-md mx-auto leading-relaxed">
+        Unwrapping activates the moment $BULLS launches on pump.fun and the
+        program is initialized.
+      </p>
+      <div className="flex justify-center gap-3 flex-wrap">
+        <Link href="/thesis" className="btn btn-primary">Read the thesis</Link>
+        <Link href="/art" className="btn btn-secondary">See the art</Link>
+      </div>
+    </div>
+  );
+}
+
 // Wait for `total_unwrapped` to advance past `target` before continuing.
-// Mirrors waitForBankAdvance for unwraps — protects the post-unwrap refresh
+// Mirrors waitForBankAdvance for unwraps - protects the post-unwrap refresh
 // from RPC commitment races that would otherwise show the just-unwrapped
 // bull still in the user's list.
 async function waitForUnwrapReflected(
@@ -39,6 +61,7 @@ export default function UnwrapPage() {
   const [bulls, setBulls] = useState<{ tier: number; nftMint: PublicKey; bullAsset: PublicKey }[]>([]);
   const [busyTier, setBusyTier] = useState<number | null>(null);
   const [status, setStatus] = useState<string>("");
+  const [simLogs, setSimLogs] = useState<string[] | null>(null);
 
   const refresh = useCallback(async () => {
     if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) return;
@@ -61,33 +84,50 @@ export default function UnwrapPage() {
 
   async function handleUnwrap(tier: number, nftMint: PublicKey) {
     if (!wallet.publicKey || !tokenMint) return;
+    if (!wallet.signTransaction || !wallet.signAllTransactions) return;
     setBusyTier(tier);
     setStatus(`Unwrapping CryptoBulls #${tier}... please approve in your wallet`);
+    setSimLogs(null);
     try {
       const program = getProgram(connection, wallet as any);
       const preBank: any = await fetchBank(program, "processed");
       const preUnwrap = BigInt(preBank.totalUnwrapped.toString());
-      const result = await unwrapBull(program, wallet.publicKey, tokenMint, tier, nftMint);
+      const result = await unwrapBull(
+        program,
+        connection,
+        wallet as any,
+        tokenMint,
+        tier,
+        nftMint,
+        (await fetchBank(program, "processed")).collectionMint,
+      );
       setStatus(`✓ Unwrapped CryptoBulls #${tier} - syncing...`);
       await waitForUnwrapReflected(program, preUnwrap + 1n);
       await refresh();
       setStatus(`✓ Unwrapped CryptoBulls #${tier} - 1,000,000 $BULLS returned. ${result.signature}`);
     } catch (e: any) {
       console.error(e);
-      setStatus(`✗ ${e.message ?? e}`);
+      if (e instanceof SimulationError) {
+        setSimLogs(e.logs);
+        setStatus(`✗ ${e.message}`);
+      } else {
+        setStatus(`✗ ${e.message ?? e}`);
+      }
     } finally {
       setBusyTier(null);
     }
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-16">
+    <main className="max-w-4xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="h1 mb-3">Unwrap your <span style={{ color: "var(--bull-accent)" }}>Bulls</span></h1>
       <p className="text-[var(--bull-dim)] text-lg mb-10">
         Burn the NFT, redeem the 1,000,000 $BULLS. Anyone holding a Bull NFT can unwrap it - you don't need to be the original wrapper.
       </p>
 
-      {!wallet.connected ? (
+      {PRE_LAUNCH ? (
+        <PreLaunchCard />
+      ) : !wallet.connected ? (
         <div className="card text-center py-12">
           <div className="text-xl font-bold mb-3">Connect your wallet</div>
           <p className="text-[var(--bull-dim)] mb-6">Phantom, Solflare, or any Solana wallet.</p>
@@ -113,7 +153,19 @@ export default function UnwrapPage() {
           </div>
 
           {status && (
-            <div className="card mb-6 text-sm text-[var(--bull-dim)] break-words">{status}</div>
+            <div className="card mb-6 text-sm text-[var(--bull-dim)] break-words">
+              {status}
+              {simLogs && simLogs.length > 0 && (
+                <details className="mt-3 text-xs">
+                  <summary className="cursor-pointer text-[var(--bull-dim)] hover:text-[var(--bull-ink)]">
+                    Show on-chain simulation logs ({simLogs.length} lines)
+                  </summary>
+                  <pre className="mt-2 p-3 rounded-md bg-[#0a0a0e] border border-[#2a2a32] text-[#c0c0c8] overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+{simLogs.join("\n")}
+                  </pre>
+                </details>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

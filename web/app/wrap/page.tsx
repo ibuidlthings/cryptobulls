@@ -7,11 +7,46 @@ import {
   fetchBank,
   fetchUserTokenBalance,
   getProgram,
+  SimulationError,
   wrapBull,
   waitForBankAdvance,
   TOKENS_PER_BULL_BASE,
   TOKENS_PER_BULL_WHOLE,
 } from "@/lib/program";
+
+// NEXT_PUBLIC_* envs are inlined by Next.js at build time, so this is
+// determined per-build, not at request time.
+const PRE_LAUNCH = process.env.NEXT_PUBLIC_LAUNCH_STATE === "pre-launch";
+const TOKEN_MINT_DISPLAY = (process.env.NEXT_PUBLIC_TOKEN_MINT || "").trim();
+
+function PreLaunchCard() {
+  const validMint =
+    TOKEN_MINT_DISPLAY &&
+    /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(TOKEN_MINT_DISPLAY);
+  return (
+    <div className="card text-center py-12">
+      <div className="text-xs uppercase tracking-[0.25em] text-[var(--bull-dim)] mb-3">
+        Pre-launch
+      </div>
+      <div className="text-2xl font-bold mb-3">Wrap goes live at launch</div>
+      <p className="text-[var(--bull-dim)] mb-6 max-w-md mx-auto leading-relaxed">
+        Wrapping activates the moment $BULLS launches on pump.fun and the
+        program is initialized. Read the mechanic in the meantime.
+      </p>
+      {validMint && (
+        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#0e0e12] border border-[#2a2a32] text-xs mb-6">
+          <span className="text-[var(--bull-dim)]">$BULLS:</span>
+          <span className="font-mono break-all">{TOKEN_MINT_DISPLAY}</span>
+        </div>
+      )}
+      <div className="flex justify-center gap-3 flex-wrap">
+        <Link href="/thesis" className="btn btn-primary">Read the thesis</Link>
+        <Link href="/tech" className="btn btn-secondary">How it works</Link>
+        <Link href="/art" className="btn btn-secondary">The art</Link>
+      </div>
+    </div>
+  );
+}
 
 export default function WrapPage() {
   const { connection } = useConnection();
@@ -24,6 +59,7 @@ export default function WrapPage() {
   const [bullsRemaining, setBullsRemaining] = useState<number>(1000);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>("");
+  const [simLogs, setSimLogs] = useState<string[] | null>(null);
   const [lastResult, setLastResult] = useState<{ tier: number; nftMint: string; sig: string } | null>(null);
 
   const refresh = useCallback(async () => {
@@ -36,7 +72,7 @@ export default function WrapPage() {
       // Mirror on-chain pop_tier semantics: free_tiers stack pops LIFO before
       // we fall back to next_tier. If the website passes a different tier
       // than the program would pop, wrap_bull reverts with TierMismatch
-      // (Phantom still prompts — failure happens after broadcast).
+      // (Phantom still prompts - failure happens after broadcast).
       const tierToWrap = bank.freeTiers.length > 0
         ? bank.freeTiers[bank.freeTiers.length - 1]
         : bank.nextTier;
@@ -62,18 +98,26 @@ export default function WrapPage() {
     if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) return;
     if (!tokenMint) return;
     setBusy(true); setStatus("Building transaction...");
+    setSimLogs(null);
     try {
       const program = getProgram(connection, wallet as any);
       const tier = nextTier;
       // Capture pre-wrap totalWrapped so we can confirm the chain advanced
       // before the next refresh runs. Without this, RPC commitment race can
       // make refresh() see stale state and the UI re-offers the same tier
-      // — clicking that re-offers fails with custom error 0x0 (PDA in use).
+      // - clicking that re-offers fails with custom error 0x0 (PDA in use).
       const preBank: any = await fetchBank(program, "processed");
       const preTotal = BigInt(preBank.totalWrapped.toString());
       const { PublicKey } = await import("@solana/web3.js");
       setStatus(`Wrapping CryptoBulls #${tier}... please approve in your wallet`);
-      const result = await wrapBull(program, wallet.publicKey, new PublicKey(tokenMint), tier);
+      const result = await wrapBull(
+        program,
+        connection,
+        wallet as any,
+        new PublicKey(tokenMint),
+        tier,
+        (await fetchBank(program, "processed")).collectionMint,
+      );
       setStatus(`✓ Wrapped CryptoBulls #${result.tier} - syncing...`);
       setLastResult({ tier: result.tier, nftMint: result.nftMint.toBase58(), sig: result.signature });
       // Wait for the chain read to reflect the new total before refresh().
@@ -82,20 +126,27 @@ export default function WrapPage() {
       setStatus(`✓ Wrapped CryptoBulls #${result.tier}`);
     } catch (e: any) {
       console.error(e);
-      setStatus(`✗ ${e.message ?? e}`);
+      if (e instanceof SimulationError) {
+        setSimLogs(e.logs);
+        setStatus(`✗ ${e.message}`);
+      } else {
+        setStatus(`✗ ${e.message ?? e}`);
+      }
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-6 py-16">
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="h1 mb-3">Wrap a <span style={{ color: "var(--bull-accent)" }}>Bull</span></h1>
       <p className="text-[var(--bull-dim)] text-lg mb-10">
         Lock 1,000,000 $BULLS into a fresh CryptoBull NFT. The vault follows the NFT through every transfer.
       </p>
 
-      {!wallet.connected ? (
+      {PRE_LAUNCH ? (
+        <PreLaunchCard />
+      ) : !wallet.connected ? (
         <div className="card text-center py-12">
           <div className="text-xl font-bold mb-3">Connect your wallet</div>
           <p className="text-[var(--bull-dim)] mb-6">Phantom, Solflare, or any Solana wallet.</p>
@@ -156,6 +207,16 @@ export default function WrapPage() {
               >
                 {status}
               </div>
+            )}
+            {simLogs && simLogs.length > 0 && (
+              <details className="mt-3 text-xs">
+                <summary className="cursor-pointer text-[var(--bull-dim)] hover:text-[var(--bull-ink)]">
+                  Show on-chain simulation logs ({simLogs.length} lines)
+                </summary>
+                <pre className="mt-2 p-3 rounded-md bg-[#0a0a0e] border border-[#2a2a32] text-[#c0c0c8] overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+{simLogs.join("\n")}
+                </pre>
+              </details>
             )}
           </div>
 

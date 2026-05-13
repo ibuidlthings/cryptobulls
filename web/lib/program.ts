@@ -14,6 +14,8 @@ import {
   ComputeBudgetProgram,
   Commitment,
   Transaction,
+  TransactionMessage,
+  VersionedTransaction,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
 } from "@solana/web3.js";
@@ -81,10 +83,19 @@ export function masterEditionPda(nftMint: PublicKey): [PublicKey, number] {
   );
 }
 
+// MCC: Metaplex Certified Collection authority is a program PDA so the
+// program signs verify_sized_collection_item on every wrap.
+export function collectionAuthorityPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("collection_authority")],
+    PROGRAM_ID
+  );
+}
+
 export interface WalletLike {
   publicKey: PublicKey;
-  signTransaction<T extends Transaction>(tx: T): Promise<T>;
-  signAllTransactions<T extends Transaction>(txs: T[]): Promise<T[]>;
+  signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
+  signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>;
 }
 
 export function getProgram(connection: Connection, wallet: WalletLike): Program<Idl> {
@@ -179,6 +190,130 @@ export async function fetchUserOwnedBulls(
 
 export const CU_BUMP = ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 });
 
+// Thrown when our pre-sign simulation fails. The page catches this and
+// surfaces `logs` so the user sees the actual on-chain failure reason
+// instead of a Phantom "Request blocked" wall.
+export class SimulationError extends Error {
+  readonly logs: string[];
+  readonly simErr: unknown;
+  constructor(message: string, logs: string[], simErr: unknown) {
+    super(message);
+    this.name = "SimulationError";
+    this.logs = logs;
+    this.simErr = simErr;
+  }
+}
+
+// Build → simulate → sign → send, in the exact order Phantom's docs prescribe.
+//
+// Why not Anchor's `.rpc()`?
+//   Anchor builds → signs → sends. It does NOT call `simulateTransaction`
+//   before asking the wallet to sign. When Phantom's pre-sign Lighthouse
+//   check finds an on-chain failure it surfaces a generic "Request blocked /
+//   transaction reverted during simulation" warning. By simulating ourselves
+//   first we (a) prove the tx will succeed before Phantom sees it, so its
+//   own Lighthouse check passes too; or (b) catch a real failure early and
+//   surface the actual log lines.
+//
+// This implements all four mitigations from
+// https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings :
+//   1. Single signer (the payer) — enforced by our IDL.
+//   2. Phantom signs first via signTransaction (not signAndSendTransaction).
+//   3. Tx size logged when NEXT_PUBLIC_DEBUG_TX=1, so size regressions show up.
+//   4. Server-side simulate with sigVerify:false before signing.
+async function buildSignSimulateSend(
+  connection: Connection,
+  wallet: WalletLike,
+  builder: any,
+  label: string,
+): Promise<string> {
+  // 1. Build instructions via Anchor, then wrap into a VersionedTransaction.
+  //    The modern web3.js simulateTransaction overload — the only one that
+  //    accepts { sigVerify: false } — requires VersionedTransaction. We
+  //    tried casting the legacy overload to `any` and it threw "Invalid
+  //    arguments" at runtime because the second positional is `signers`,
+  //    not a config object.
+  const legacyTx: Transaction = await builder.transaction();
+  const instructions = legacyTx.instructions;
+
+  // 2. "finalized" blockhash avoids the race where Phantom resimulates
+  //    against a not-yet-surfaced slot and surfaces a generic warning.
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("finalized");
+
+  // 3. Compile v0 message. Single signer (payer) — IDL confirms only
+  //    payer is signer:true for wrap_bull/unwrap_bull.
+  const message = new TransactionMessage({
+    payerKey: wallet.publicKey,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(message);
+
+  // 4. Server-side simulate FIRST (Phantom mitigation #4). sigVerify:false
+  //    because tx isn't signed yet. This is the step Anchor's .rpc() skips.
+  const sim = await connection.simulateTransaction(tx, {
+    sigVerify: false,
+    replaceRecentBlockhash: false,
+    commitment: "processed",
+  });
+
+  // 5. Always-on diagnostic. Copy/paste this object from the browser
+  //    console into Phantom support tickets — it contains everything they
+  //    need to reproduce.
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.log(`[bullpeg-tx:${label}]`, {
+      size: tx.serialize().length,
+      numRequiredSignatures: message.header.numRequiredSignatures,
+      numReadonlySignedAccounts: message.header.numReadonlySignedAccounts,
+      numReadonlyUnsignedAccounts: message.header.numReadonlyUnsignedAccounts,
+      staticAccountKeys: message.staticAccountKeys.length,
+      simulationErr: sim.value.err,
+      simulationLogs: sim.value.logs,
+      txVersion: message.version,
+      blockhash,
+    });
+  }
+
+  if (sim.value.err) {
+    const logs: string[] = sim.value.logs ?? [];
+    // Anchor emits errors as "AnchorError ... Error Code: X. Error
+    // Number: Y. Error Message: Z". Pull the human-readable line.
+    const errLine =
+      logs.find((l: string) => l.includes("Error Message:")) ??
+      logs[logs.length - 1] ??
+      "unknown";
+    throw new SimulationError(
+      `simulation failed: ${errLine}`,
+      logs,
+      sim.value.err,
+    );
+  }
+
+  // 6. Phantom signs FIRST (Phantom mitigation #2). Single signer, so no
+  //    partialSign step is required afterwards. signTransaction (NOT
+  //    signAndSendTransaction) per Phantom's docs.
+  const signedTx = await wallet.signTransaction(tx);
+
+  // 7. Send raw. skipPreflight:false lets the RPC catch obvious failures
+  //    locally; we already simulated above so this should be cheap.
+  const sig = await connection.sendRawTransaction(signedTx.serialize(), {
+    skipPreflight: false,
+    preflightCommitment: "processed",
+    maxRetries: 3,
+  });
+
+  // 8. Confirm using the same blockhash we built with, so we honor its
+  //    lifetime rather than waiting on a fresh getBlockHeight loop.
+  await connection.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
+
+  return sig;
+}
+
 export interface WrapResult {
   signature: string;
   tier: number;
@@ -187,45 +322,68 @@ export interface WrapResult {
 
 export async function wrapBull(
   program: Program<Idl>,
-  payer: PublicKey,
+  connection: Connection,
+  wallet: WalletLike,
   tokenMint: PublicKey,
-  tier: number
+  tier: number,
+  collectionMint: PublicKey
 ): Promise<WrapResult> {
-  const nftMint = Keypair.generate();
+  // SINGLE-SIGNER pattern (Phantom's docs Bullet #1). nft_mint is a PDA
+  // derived from bank.total_wrapped (pre-increment), so no random Keypair
+  // signer is needed. Lighthouse can simulate cleanly.
+  const payer = wallet.publicKey;
   const [bank] = bankPda();
-  const [vaultAuthority] = vaultAuthorityPda(nftMint.publicKey);
+  const bankAccount: any = await (program.account as any).bullBank.fetch(
+    bank,
+    "processed"
+  );
+  const totalWrappedBuf = Buffer.alloc(8);
+  totalWrappedBuf.writeBigUInt64LE(BigInt(bankAccount.totalWrapped.toString()));
+  const [nftMint] = PublicKey.findProgramAddressSync(
+    [Buffer.from("nft_mint"), totalWrappedBuf],
+    PROGRAM_ID
+  );
+
+  const [vaultAuthority] = vaultAuthorityPda(nftMint);
   const [bullAsset] = bullAssetPda(tier);
   const vault = getAssociatedTokenAddressSync(tokenMint, vaultAuthority, true);
   const payerTokenAccount = getAssociatedTokenAddressSync(tokenMint, payer);
-  const payerNftAccount = getAssociatedTokenAddressSync(nftMint.publicKey, payer);
-  const [metadata] = metadataPda(nftMint.publicKey);
-  const [masterEdition] = masterEditionPda(nftMint.publicKey);
+  const payerNftAccount = getAssociatedTokenAddressSync(nftMint, payer);
+  const [metadata] = metadataPda(nftMint);
+  const [masterEdition] = masterEditionPda(nftMint);
+  // MCC accounts:
+  const [collectionAuthority] = collectionAuthorityPda();
+  const [collectionMetadata] = metadataPda(collectionMint);
+  const [collectionMasterEdition] = masterEditionPda(collectionMint);
 
-  const sig = await (program.methods as any)
+  const builder = (program.methods as any)
     .wrapBull(tier)
     .accounts({
       bank,
       payer,
       payerTokenAccount,
       tokenMint,
-      nftMint: nftMint.publicKey,
+      nftMint,
       nftMintAuthority: vaultAuthority,
       vault,
       payerNftAccount,
       bullAsset,
       metadata,
       masterEdition,
+      collectionMint,
+      collectionMetadata,
+      collectionMasterEdition,
+      collectionAuthority,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .preInstructions([CU_BUMP])
-    .signers([nftMint])
-    .rpc();
+    .preInstructions([CU_BUMP]);
 
-  return { signature: sig, tier, nftMint: nftMint.publicKey };
+  const signature = await buildSignSimulateSend(connection, wallet, builder, "wrapBull");
+  return { signature, tier, nftMint };
 }
 
 export interface UnwrapResult {
@@ -235,11 +393,14 @@ export interface UnwrapResult {
 
 export async function unwrapBull(
   program: Program<Idl>,
-  payer: PublicKey,
+  connection: Connection,
+  wallet: WalletLike,
   tokenMint: PublicKey,
   tier: number,
-  nftMint: PublicKey
+  nftMint: PublicKey,
+  collectionMint: PublicKey
 ): Promise<UnwrapResult> {
+  const payer = wallet.publicKey;
   const [bank] = bankPda();
   const [vaultAuthority] = vaultAuthorityPda(nftMint);
   const [bullAsset] = bullAssetPda(tier);
@@ -248,8 +409,11 @@ export async function unwrapBull(
   const payerNftAccount = getAssociatedTokenAddressSync(nftMint, payer);
   const [metadata] = metadataPda(nftMint);
   const [masterEdition] = masterEditionPda(nftMint);
+  // burn_nft on a verified-collection NFT decrements the collection's
+  // size counter, so we must pass the collection mint + metadata.
+  const [collectionMetadata] = metadataPda(collectionMint);
 
-  const sig = await (program.methods as any)
+  const builder = (program.methods as any)
     .unwrapBull(tier)
     .accounts({
       bank,
@@ -263,11 +427,13 @@ export async function unwrapBull(
       bullAsset,
       metadata,
       masterEdition,
+      collectionMint,
+      collectionMetadata,
       tokenProgram: TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
     })
-    .preInstructions([CU_BUMP])
-    .rpc();
+    .preInstructions([CU_BUMP]);
 
-  return { signature: sig, tier };
+  const signature = await buildSignSimulateSend(connection, wallet, builder, "unwrapBull");
+  return { signature, tier };
 }
