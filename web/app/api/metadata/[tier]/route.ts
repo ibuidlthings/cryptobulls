@@ -24,7 +24,7 @@ const TRAIT_LABELS = {
     "dubai_hat", "strawberry_hat", "apple", "crown", "halo", "devil_aura",
     "diamond_aura", "fire_aura", "beanie", "tinfoil", "headband", "mohawk",
     "top_hat", "sheriff_hat", "tiara", "halo_stars", "earring", "mole",
-    "rosy_cheeks", "scar",
+    "rosy_cheeks", "scar", "Pump", "Phantom",
   ],
   eyewear: [
     "none", "mog", "sunglasses_classic", "clout_shades", "thug_life",
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       // Metadata for a wrapped bull is immutable: traits are seeded from
       // nft_mint and the visual is locked at wrap time. Cache aggressively
       // so Magic Eden / Tensor crawlers don't hammer our RPC. After unwrap
-      // the URL 404s — marketplaces re-crawl on burn anyway.
+      // the URL 404s - marketplaces re-crawl on burn anyway.
       "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
       "Access-Control-Allow-Origin": "*",
     },

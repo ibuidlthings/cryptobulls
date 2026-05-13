@@ -82,10 +82,10 @@ const HORN_WEIGHTS    = [55, 18, 15,  7,  5]; // ivory / dark / gold / crimson /
 //                       normal gold void grn closed angry crying ski_mask
 const EYE_WEIGHTS     = [ 55,    3,   3,  3,  14,    12,   8,    1]; // ski_mask legendary
 const BG_WEIGHTS      = [28, 22, 14, 12,  4, 16,  4]; // pasture/sand/sky common, void epic
-//                       none ring bell paint chain cowboy dubai strw apple crown halo devil diamond fire beanie tinfoil headband mohawk top_hat sheriff tiara halostars earring mole rosy scar
+//                       none ring bell paint chain cowboy dubai strw apple crown halo devil diamond fire beanie tinfoil headband mohawk top_hat sheriff tiara halostars earring mole rosy scar pump phantom
 //  (nose_ring=0, war_paint=0, devil_aura=0, mole=0, rosy_cheeks=0 — REMOVED; indices kept for backward-compat)
-//  halo_stars legendary; dubai/fire_aura/halo/diamond_aura/scar epic; tiara/top_hat/mohawk/etc rare; tinfoil/sheriff/cowboy/bell/gold_chain uncommon
-const ACC_WEIGHTS     = [ 36,   0,   6,    0,    6,     6,    2,    3,    3,    3,   2,    0,      2,    2,     3,      6,       3,      3,    3,      6,    3,    1,         3,    0,    0,   2];
+//  halo_stars legendary; dubai/fire_aura/halo/diamond_aura/scar epic; tiara/top_hat/mohawk/pump/phantom/etc rare; tinfoil/sheriff/cowboy/bell/gold_chain uncommon
+const ACC_WEIGHTS     = [ 36,   0,   6,    0,    6,     6,    2,    3,    3,    3,   2,    0,      2,    2,     3,      6,       3,      3,    3,      6,    3,    1,         3,    0,    0,   2,    3,    3];
 //                       none mog classic clout thug 3d_glasses big_shades(=0) swag(=0) lasers
 const EYEWEAR_WEIGHTS = [ 50,          6,     12,   12,   6,        12,             0,        0,     2];
 //                       none cig cigar(=0) grill smug(=0) bubble smile(=0) frown tongue shout pacifier(=0)
@@ -1265,6 +1265,112 @@ const ACCESSORIES = {
     { row: 5, col: 12, color: '#ffc020' },
     { row: 5, col: 13, color: '#ff5028' },
   ],
+  pump: [
+    // "Pump" — horizontal capsule pill floating above the head, centered
+    // between the horn tips. Named for the pump.fun origin. 6 cells wide x
+    // 4 rows tall (rows 0-3, cols 9-14). Cols 9 and 14 in rows 0/3 stay
+    // empty so the caps read as rounded.
+    //
+    // Left half green, right half white with a vertical seam at the col
+    // 11/12 boundary. Subtle top-light / bottom-shadow gives a 3D feel.
+    //
+    // Palette: outline #1a3a2a / green_light #5ddb95 / green #4cd97a /
+    //          green_dark #2ab85a / white_bright #ffffff / white #f0f0f0 /
+    //          white_shade #d0d0d0
+
+    // === ROW 0: top arc (outline only — caps at 9/14 empty for rounding) ===
+    { row: 0, col: 10, color: '#1a3a2a' },
+    { row: 0, col: 11, color: '#1a3a2a' },
+    { row: 0, col: 12, color: '#1a3a2a' },
+    { row: 0, col: 13, color: '#1a3a2a' },
+
+    // === ROW 1: upper body (left cap + green half | white half + right cap) ===
+    { row: 1, col: 9,  color: '#1a3a2a' }, // left cap
+    { row: 1, col: 10, color: '#5ddb95' }, // green top-light highlight
+    { row: 1, col: 11, color: '#4cd97a' }, // green main
+    { row: 1, col: 12, color: '#ffffff' }, // white bright (top-right shine)
+    { row: 1, col: 13, color: '#f0f0f0' }, // white main
+    { row: 1, col: 14, color: '#1a3a2a' }, // right cap
+
+    // === ROW 2: lower body (slightly darker for cylindrical 3D feel) ===
+    { row: 2, col: 9,  color: '#1a3a2a' }, // left cap
+    { row: 2, col: 10, color: '#4cd97a' }, // green main
+    { row: 2, col: 11, color: '#2ab85a' }, // green bottom-shadow
+    { row: 2, col: 12, color: '#f0f0f0' }, // white main
+    { row: 2, col: 13, color: '#d0d0d0' }, // white bottom-shadow
+    { row: 2, col: 14, color: '#1a3a2a' }, // right cap
+
+    // === ROW 3: bottom arc (outline only — caps at 9/14 empty for rounding) ===
+    { row: 3, col: 10, color: '#1a3a2a' },
+    { row: 3, col: 11, color: '#1a3a2a' },
+    { row: 3, col: 12, color: '#1a3a2a' },
+    { row: 3, col: 13, color: '#1a3a2a' },
+  ],
+  phantom: [
+    // "Phantom" — sheet ghost shaped to match the Phantom wallet logo. 8
+    // wide x 5 tall at LAYOUT rows 1-5, cols 8-15. Allowed to overlap the
+    // bull's forehead (rows 4-5 head cells at cols 8-15) — the ghost
+    // visually "sits on" the head, which matches the reference's tilted
+    // floating-over feel. Stays well clear of the bull's eyes (rows 9-10),
+    // mouth (rows 12-17), and horns (cols 5-6 / 17-18). No inter-trait
+    // interference.
+    //
+    // Shape (mirrors the Phantom logo):
+    //   . W W W W W . .       row 1: top dome (cols 9-13)
+    //   W W W W W W W .       row 2: widens (cols 8-14) — covers ABOVE both eyes
+    //   W W W W E W E W       row 3: eyes at cols 12 & 14 (upper-right)
+    //   W W W W W W W W       row 4: widest body (cols 8-15)
+    //   W . W W . W W .       row 5: scalloped tail, 3 humps + right curl
+    //
+    // Row 1-2 must extend to col 14 so the right eye at col 14 row 3 has
+    // body cells directly above it — otherwise the eye looks cut off at
+    // the top of the ghost.
+    //
+    // Palette: ghost_body #ffffff / ghost_eye #181818
+
+    // === ROW 1: top dome (5 cells, cols 9-13) ===
+    { row: 1, col: 9,  color: '#ffffff' },
+    { row: 1, col: 10, color: '#ffffff' },
+    { row: 1, col: 11, color: '#ffffff' },
+    { row: 1, col: 12, color: '#ffffff' },
+    { row: 1, col: 13, color: '#ffffff' },
+
+    // === ROW 2: widening (cols 8-14) — covers above both eyes ===
+    { row: 2, col: 8,  color: '#ffffff' },
+    { row: 2, col: 9,  color: '#ffffff' },
+    { row: 2, col: 10, color: '#ffffff' },
+    { row: 2, col: 11, color: '#ffffff' },
+    { row: 2, col: 12, color: '#ffffff' },
+    { row: 2, col: 13, color: '#ffffff' },
+    { row: 2, col: 14, color: '#ffffff' },
+
+    // === ROW 3: eye row — eyes at cols 12 & 14, body wraps around them ===
+    { row: 3, col: 8,  color: '#ffffff' },
+    { row: 3, col: 9,  color: '#ffffff' },
+    { row: 3, col: 10, color: '#ffffff' },
+    { row: 3, col: 11, color: '#ffffff' },
+    { row: 3, col: 12, color: '#181818' }, // left eye (centered on the right-ish side)
+    { row: 3, col: 13, color: '#ffffff' },
+    { row: 3, col: 14, color: '#181818' }, // right eye
+    { row: 3, col: 15, color: '#ffffff' }, // body cell to right of right eye
+
+    // === ROW 4: widest body (cols 8-15) — full 8 cells ===
+    { row: 4, col: 8,  color: '#ffffff' },
+    { row: 4, col: 9,  color: '#ffffff' },
+    { row: 4, col: 10, color: '#ffffff' },
+    { row: 4, col: 11, color: '#ffffff' },
+    { row: 4, col: 12, color: '#ffffff' },
+    { row: 4, col: 13, color: '#ffffff' },
+    { row: 4, col: 14, color: '#ffffff' },
+    { row: 4, col: 15, color: '#ffffff' },
+
+    // === ROW 5: scalloped tail — 3 humps with gaps (cols 8, 10-11, 13-14) ===
+    { row: 5, col: 8,  color: '#ffffff' }, // left foot
+    { row: 5, col: 10, color: '#ffffff' }, // center hump left
+    { row: 5, col: 11, color: '#ffffff' }, // center hump right
+    { row: 5, col: 13, color: '#ffffff' }, // right hump left
+    { row: 5, col: 14, color: '#ffffff' }, // right hump right (the curl tip)
+  ],
 };
 
 // Eyewear overlays.
@@ -1960,6 +2066,8 @@ const ACC_NAMES = [
   'mole',           // 23  CryptoPunks reference (face mark)
   'rosy_cheeks',    // 24  Cute face mark
   'scar',           // 25  Battle bull face mark
+  'pump',           // 26  Rare — green/white capsule floating between horns
+  'phantom',        // 27  Rare — tiny ghost floating between horns
 ];
 
 // Eyewear (overlays the eye area, hiding eyes when not "none").
