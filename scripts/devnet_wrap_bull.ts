@@ -49,11 +49,18 @@ async function main() {
   console.log("collection_mint:", collectionMint.toBase58());
   console.log("next tier:      ", tier);
 
-  const nftMint = Keypair.generate();
-  console.log("new nft mint:", nftMint.publicKey.toBase58());
+  // Single-signer: nft_mint is a PDA derived from bank.total_wrapped
+  // (pre-increment). Same seed as the program-side init constraint.
+  const totalWrappedBuf = Buffer.alloc(8);
+  totalWrappedBuf.writeBigUInt64LE(BigInt(bank.totalWrapped.toString()));
+  const [nftMint] = PublicKey.findProgramAddressSync(
+    [Buffer.from("nft_mint"), totalWrappedBuf],
+    program.programId
+  );
+  console.log("nft mint (PDA):", nftMint.toBase58());
 
   const [vaultAuthority] = PublicKey.findProgramAddressSync(
-    [Buffer.from("vault"), nftMint.publicKey.toBuffer()],
+    [Buffer.from("vault"), nftMint.toBuffer()],
     program.programId
   );
   const tierBytes = Buffer.alloc(2);
@@ -65,14 +72,14 @@ async function main() {
 
   const vault = getAssociatedTokenAddressSync(tokenMint, vaultAuthority, true);
   const payerTokenAccount = getAssociatedTokenAddressSync(tokenMint, payer.publicKey);
-  const payerNftAccount = getAssociatedTokenAddressSync(nftMint.publicKey, payer.publicKey);
+  const payerNftAccount = getAssociatedTokenAddressSync(nftMint, payer.publicKey);
 
   const [metadata] = PublicKey.findProgramAddressSync(
-    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), nftMint.publicKey.toBuffer()],
+    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), nftMint.toBuffer()],
     TOKEN_METADATA_PROGRAM_ID
   );
   const [masterEdition] = PublicKey.findProgramAddressSync(
-    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), nftMint.publicKey.toBuffer(), Buffer.from("edition")],
+    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), nftMint.toBuffer(), Buffer.from("edition")],
     TOKEN_METADATA_PROGRAM_ID
   );
 
@@ -109,7 +116,7 @@ async function main() {
       payer: payer.publicKey,
       payerTokenAccount,
       tokenMint,
-      nftMint: nftMint.publicKey,
+      nftMint,
       nftMintAuthority: vaultAuthority,
       vault,
       payerNftAccount,
@@ -127,12 +134,11 @@ async function main() {
       rent: SYSVAR_RENT_PUBKEY,
     } as any)
     .preInstructions([cuBump])
-    .signers([nftMint])
     .rpc();
 
   console.log("\nwrap_bull tx:", sig);
   console.log("explorer:    https://explorer.solana.com/tx/" + sig + "?cluster=devnet");
-  console.log("nft mint:    https://explorer.solana.com/address/" + nftMint.publicKey.toBase58() + "?cluster=devnet");
+  console.log("nft mint:    https://explorer.solana.com/address/" + nftMint.toBase58() + "?cluster=devnet");
   console.log("bull asset:  https://explorer.solana.com/address/" + bullAsset.toBase58() + "?cluster=devnet");
   console.log("\nCheck Phantom devnet for the new CryptoBulls #" + tier + " NFT.");
 }

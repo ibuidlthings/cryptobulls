@@ -60,6 +60,234 @@
       ]
     },
     {
+      "name": "initialize_collection",
+      "docs": [
+        "One-time setup: creates the Metaplex Certified Collection (MCC)",
+        "parent NFT. Must be called by `bank.authority` exactly once. After",
+        "this, every wrap_bull verifies its NFT into this collection so",
+        "Magic Eden / Tensor / Phantom recognise the bulls as a real",
+        "collection (no DYOR warnings, searchable by collection, floor",
+        "pricing surfaces)."
+      ],
+      "discriminator": [
+        112,
+        62,
+        53,
+        139,
+        173,
+        152,
+        98,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "bank",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  110,
+                  107
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Deployer wallet — pays rent for collection mint, ATA, metadata,",
+            "master edition. Must equal bank.authority."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collection_mint",
+          "docs": [
+            "Fresh keypair for the collection NFT mint (caller-generated).",
+            "Initialized here with decimals=0; mint+freeze authority is the",
+            "program-controlled `collection_authority` PDA so we can sign",
+            "verify CPIs for every future wrap_bull."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "collection_authority",
+          "docs": [
+            "Program PDA that signs as Metaplex update_authority + mint authority",
+            "for the collection NFT. Same PDA signs verify_sized_collection_item",
+            "for every wrap_bull, so the program (not a wallet) is the authority."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_collection_ata",
+          "docs": [
+            "Deployer's ATA for the collection NFT (receives the 1-supply mint).",
+            "Holding the collection NFT in the deployer's wallet is the standard",
+            "Tensor/ME pattern and lets the deployer claim the collection on",
+            "Creator Hub / Tensor Creator Portal."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "collection_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "collection_metadata",
+          "docs": [
+            "Metaplex metadata account for the collection NFT."
+          ],
+          "writable": true
+        },
+        {
+          "name": "collection_master_edition",
+          "docs": [
+            "Metaplex master edition account for the collection NFT."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "unwrap_bull",
       "docs": [
         "Unwrap a bull NFT, releasing the locked 1M $TOKEN to the caller.",
@@ -383,6 +611,20 @@
           "writable": true
         },
         {
+          "name": "collection_mint",
+          "docs": [
+            "Collection NFT mint (must equal `bank.collection_mint`).",
+            "Required for the burn_nft CPI on verified collection members."
+          ]
+        },
+        {
+          "name": "collection_metadata",
+          "docs": [
+            "Collection NFT's Metaplex metadata account (mut — burn decrements size)."
+          ],
+          "writable": true
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -470,12 +712,41 @@
         {
           "name": "nft_mint",
           "docs": [
-            "Fresh keypair for the new NFT mint. Caller generates this client-side",
-            "and passes the keypair as a signer. The mint is initialized here with",
-            "decimals=0 and the vault PDA as both mint + freeze authority."
+            "NFT mint for this bull. PDA derived from the bank's pre-increment",
+            "`total_wrapped` value, so each wrap gets a unique mint address",
+            "without requiring an external Keypair signer client-side. This is",
+            "the single-signer pattern Phantom's docs recommend (Domain and",
+            "transaction warnings, bullet 1) and lets Lighthouse simulate the",
+            "tx cleanly without flagging it as a suspicious multi-signer pattern.",
+            "",
+            "Re-roll-on-tier-reuse is preserved: total_wrapped monotonically",
+            "increases, so re-wrapped tier #42 (at total_wrapped=42) and",
+            "re-wrapped tier #42 (later at total_wrapped=N) have different mint",
+            "addresses and therefore different generative visuals."
           ],
           "writable": true,
-          "signer": true
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  102,
+                  116,
+                  95,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bank.total_wrapped",
+                "account": "BullBank"
+              }
+            ]
+          }
         },
         {
           "name": "nft_mint_authority",
@@ -735,6 +1006,65 @@
           "writable": true
         },
         {
+          "name": "collection_mint",
+          "docs": [
+            "Collection NFT mint (must equal `bank.collection_mint`).",
+            "Constraint blocks any wrap before the collection is initialized",
+            "(CollectionNotInitialized — bank.collection_mint == default).",
+            "verify CPI revalidates everything else."
+          ]
+        },
+        {
+          "name": "collection_metadata",
+          "docs": [
+            "Collection NFT's Metaplex metadata account."
+          ],
+          "writable": true
+        },
+        {
+          "name": "collection_master_edition",
+          "docs": [
+            "Collection NFT's Metaplex master edition account."
+          ]
+        },
+        {
+          "name": "collection_authority",
+          "docs": [
+            "Program PDA that signs verify_sized_collection_item as the",
+            "collection's update_authority. Same PDA established by",
+            "initialize_collection."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -836,6 +1166,26 @@
       "code": 6008,
       "name": "VaultBalanceMismatch",
       "msg": "Vault balance is not exactly 1,000,000 tokens"
+    },
+    {
+      "code": 6009,
+      "name": "CollectionNotInitialized",
+      "msg": "Metaplex Certified Collection not initialized — call initialize_collection first"
+    },
+    {
+      "code": 6010,
+      "name": "WrongCollection",
+      "msg": "Provided collection mint does not match BullBank.collection_mint"
+    },
+    {
+      "code": 6011,
+      "name": "CollectionAlreadyInitialized",
+      "msg": "Collection NFT already initialized (idempotency guard)"
+    },
+    {
+      "code": 6012,
+      "name": "NotProgramAuthority",
+      "msg": "Caller is not the program authority recorded in BullBank"
     }
   ],
   "types": [
@@ -975,6 +1325,22 @@
             "type": "u8"
           },
           {
+            "name": "collection_mint",
+            "docs": [
+              "Metaplex Certified Collection (MCC) NFT mint. Set by",
+              "`initialize_collection` after `initialize`. Pubkey::default() until",
+              "then. Each `wrap_bull` references this and verifies the freshly",
+              "minted bull NFT into this collection (so Magic Eden / Tensor /",
+              "Phantom recognise the collection).",
+              "",
+              "Layout note: this slot was carved out of the original 64-byte",
+              "`reserved` block, so the on-chain account size is unchanged. Existing",
+              "banks deserialize this field as Pubkey::default() (all zeros) until",
+              "initialize_collection writes it."
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "reserved",
             "docs": [
               "Reserved for future fields. Do not remove without state migration."
@@ -982,7 +1348,7 @@
             "type": {
               "array": [
                 "u8",
-                64
+                32
               ]
             }
           }

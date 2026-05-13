@@ -134,6 +134,18 @@ interface WrapBullPdas {
   masterEdition: PublicKey;
 }
 
+// Single-signer PDA mint: derived from bank.total_wrapped BEFORE this wrap.
+// Matches the seeds in programs/bullpeg/src/instructions/wrap_bull.rs.
+function deriveNftMint(programId: PublicKey, totalWrappedBefore: bigint): PublicKey {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(totalWrappedBefore);
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("nft_mint"), buf],
+    programId
+  );
+  return pda;
+}
+
 function deriveWrapPdas(
   programId: PublicKey,
   tierIndex: number,
@@ -373,9 +385,14 @@ describe("bullpeg", () => {
 
   it("wrap_bull: alice wraps 1M $TOKEN into bull tier 1", async () => {
     const tierIndex = 1;
-    const nftMint = Keypair.generate();
+    // Single-signer: nft_mint is a PDA derived from bank.total_wrapped.
+    const bankBefore: any = await program.account.bullBank.fetch(bankPda);
+    const nftMintPk = deriveNftMint(
+      program.programId,
+      BigInt(bankBefore.totalWrapped.toString()),
+    );
     const pdas = deriveWrapPdas(
-      program.programId, tierIndex, nftMint.publicKey, tokenMint, alice.publicKey
+      program.programId, tierIndex, nftMintPk, tokenMint, alice.publicKey
     );
     const collPdas = deriveCollectionPdas(
       program.programId, collectionMint.publicKey, alice.publicKey,
@@ -390,7 +407,7 @@ describe("bullpeg", () => {
         payer: alice.publicKey,
         payerTokenAccount: aliceTokenAccount,
         tokenMint,
-        nftMint: nftMint.publicKey,
+        nftMint: nftMintPk,
         nftMintAuthority: pdas.vaultAuthority,
         vault: pdas.vault,
         payerNftAccount: pdas.payerNftAccount,
@@ -408,12 +425,12 @@ describe("bullpeg", () => {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .preInstructions([CU_BUMP], true)
-      .signers([alice, nftMint])
+      .signers([alice])
       .rpc();
 
     // BullAsset stored correctly
     const bullAsset = await program.account.bullAsset.fetch(pdas.bullAsset);
-    expect(bullAsset.nftMint.toBase58()).to.equal(nftMint.publicKey.toBase58());
+    expect(bullAsset.nftMint.toBase58()).to.equal(nftMintPk.toBase58());
     expect(bullAsset.tierIndex).to.equal(tierIndex);
 
     // Vault holds 1M $TOKEN
@@ -509,9 +526,15 @@ describe("bullpeg", () => {
 
   it("tier reuse: next wrap pops tier 1 from free_tiers (with new visual)", async () => {
     const tierIndex = 1; // reused from free_tiers
-    const nftMint = Keypair.generate(); // FRESH mint → new visual seed
+    // total_wrapped has advanced since last wrap (it was 1 then, 2 by now after
+    // tier 1 was wrapped+unwrapped). New PDA = different mint = new visual.
+    const bankBefore: any = await program.account.bullBank.fetch(bankPda);
+    const nftMintPk = deriveNftMint(
+      program.programId,
+      BigInt(bankBefore.totalWrapped.toString()),
+    );
     const pdas = deriveWrapPdas(
-      program.programId, tierIndex, nftMint.publicKey, tokenMint, alice.publicKey
+      program.programId, tierIndex, nftMintPk, tokenMint, alice.publicKey
     );
     const collPdas = deriveCollectionPdas(
       program.programId, collectionMint.publicKey, alice.publicKey,
@@ -524,7 +547,7 @@ describe("bullpeg", () => {
         payer: alice.publicKey,
         payerTokenAccount: aliceTokenAccount,
         tokenMint,
-        nftMint: nftMint.publicKey,
+        nftMint: nftMintPk,
         nftMintAuthority: pdas.vaultAuthority,
         vault: pdas.vault,
         payerNftAccount: pdas.payerNftAccount,
@@ -542,7 +565,7 @@ describe("bullpeg", () => {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .preInstructions([CU_BUMP], true)
-      .signers([alice, nftMint])
+      .signers([alice])
       .rpc();
 
     // Re-rolled visual is also verified into the collection
@@ -550,9 +573,10 @@ describe("bullpeg", () => {
       connection, pdas.metadata, collectionMint.publicKey,
     );
 
-    // BullAsset has the NEW nft_mint (visual re-rolled)
+    // BullAsset has the NEW nft_mint (visual re-rolled — different
+    // total_wrapped → different PDA → different visual)
     const bullAsset = await program.account.bullAsset.fetch(pdas.bullAsset);
-    expect(bullAsset.nftMint.toBase58()).to.equal(nftMint.publicKey.toBase58());
+    expect(bullAsset.nftMint.toBase58()).to.equal(nftMintPk.toBase58());
 
     // Bank: free_tiers is now empty, next_tier still 2
     const bank = await program.account.bullBank.fetch(bankPda);
@@ -633,9 +657,13 @@ describe("bullpeg", () => {
 
   it("wrap_bull fails when caller has insufficient balance", async () => {
     const tierIndex = 1;
-    const nftMint = Keypair.generate();
+    const bankBefore: any = await program.account.bullBank.fetch(bankPda);
+    const nftMintPk = deriveNftMint(
+      program.programId,
+      BigInt(bankBefore.totalWrapped.toString()),
+    );
     const pdas = deriveWrapPdas(
-      program.programId, tierIndex, nftMint.publicKey, tokenMint, carol.publicKey
+      program.programId, tierIndex, nftMintPk, tokenMint, carol.publicKey
     );
     const collPdas = deriveCollectionPdas(
       program.programId, collectionMint.publicKey, alice.publicKey,
@@ -651,7 +679,7 @@ describe("bullpeg", () => {
           payer: carol.publicKey,
           payerTokenAccount: carolTokenAccount,
           tokenMint,
-          nftMint: nftMint.publicKey,
+          nftMint: nftMintPk,
           nftMintAuthority: pdas.vaultAuthority,
           vault: pdas.vault,
           payerNftAccount: pdas.payerNftAccount,
@@ -669,7 +697,7 @@ describe("bullpeg", () => {
           rent: SYSVAR_RENT_PUBKEY,
         })
         .preInstructions([CU_BUMP], true)
-        .signers([carol, nftMint])
+        .signers([carol])
         .rpc();
     } catch (e: any) {
       errored = true;
@@ -685,9 +713,14 @@ describe("bullpeg", () => {
 
     // Alice wraps tiers 1, 2, 3
     for (const tierIndex of [1, 2, 3]) {
-      const nftMint = Keypair.generate();
+      // Re-read bank each iteration since total_wrapped advances per wrap.
+      const bankBefore: any = await program.account.bullBank.fetch(bankPda);
+      const nftMintPk = deriveNftMint(
+        program.programId,
+        BigInt(bankBefore.totalWrapped.toString()),
+      );
       const pdas = deriveWrapPdas(
-        program.programId, tierIndex, nftMint.publicKey, tokenMint, alice.publicKey
+        program.programId, tierIndex, nftMintPk, tokenMint, alice.publicKey
       );
 
       await program.methods
@@ -697,7 +730,7 @@ describe("bullpeg", () => {
           payer: alice.publicKey,
           payerTokenAccount: aliceTokenAccount,
           tokenMint,
-          nftMint: nftMint.publicKey,
+          nftMint: nftMintPk,
           nftMintAuthority: pdas.vaultAuthority,
           vault: pdas.vault,
           payerNftAccount: pdas.payerNftAccount,
@@ -715,7 +748,7 @@ describe("bullpeg", () => {
           rent: SYSVAR_RENT_PUBKEY,
         })
         .preInstructions([CU_BUMP], true)
-        .signers([alice, nftMint])
+        .signers([alice])
         .rpc();
 
       // Each one is a verified collection member

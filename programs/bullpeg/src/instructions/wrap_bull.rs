@@ -61,15 +61,25 @@ pub struct WrapBull<'info> {
     #[account(constraint = token_mint.key() == bank.token_mint @ BullpegError::WrongMint)]
     pub token_mint: Box<Account<'info, Mint>>,
 
-    /// Fresh keypair for the new NFT mint. Caller generates this client-side
-    /// and passes the keypair as a signer. The mint is initialized here with
-    /// decimals=0 and the vault PDA as both mint + freeze authority.
+    /// NFT mint for this bull. PDA derived from the bank's pre-increment
+    /// `total_wrapped` value, so each wrap gets a unique mint address
+    /// without requiring an external Keypair signer client-side. This is
+    /// the single-signer pattern Phantom's docs recommend (Domain and
+    /// transaction warnings, bullet 1) and lets Lighthouse simulate the
+    /// tx cleanly without flagging it as a suspicious multi-signer pattern.
+    ///
+    /// Re-roll-on-tier-reuse is preserved: total_wrapped monotonically
+    /// increases, so re-wrapped tier #42 (at total_wrapped=42) and
+    /// re-wrapped tier #42 (later at total_wrapped=N) have different mint
+    /// addresses and therefore different generative visuals.
     #[account(
         init,
         payer = payer,
         mint::decimals = 0,
         mint::authority = nft_mint_authority,
         mint::freeze_authority = nft_mint_authority,
+        seeds = [b"nft_mint", bank.total_wrapped.to_le_bytes().as_ref()],
+        bump,
     )]
     pub nft_mint: Box<Account<'info, Mint>>,
 

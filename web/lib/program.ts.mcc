@@ -201,15 +201,28 @@ export async function wrapBull(
   tier: number,
   collectionMint: PublicKey
 ): Promise<WrapResult> {
-  const nftMint = Keypair.generate();
+  // SINGLE-SIGNER pattern (Phantom's docs Bullet #1). nft_mint is a PDA
+  // derived from bank.total_wrapped (pre-increment), so no random Keypair
+  // signer is needed. Lighthouse can simulate cleanly.
   const [bank] = bankPda();
-  const [vaultAuthority] = vaultAuthorityPda(nftMint.publicKey);
+  const bankAccount: any = await (program.account as any).bullBank.fetch(
+    bank,
+    "processed"
+  );
+  const totalWrappedBuf = Buffer.alloc(8);
+  totalWrappedBuf.writeBigUInt64LE(BigInt(bankAccount.totalWrapped.toString()));
+  const [nftMint] = PublicKey.findProgramAddressSync(
+    [Buffer.from("nft_mint"), totalWrappedBuf],
+    PROGRAM_ID
+  );
+
+  const [vaultAuthority] = vaultAuthorityPda(nftMint);
   const [bullAsset] = bullAssetPda(tier);
   const vault = getAssociatedTokenAddressSync(tokenMint, vaultAuthority, true);
   const payerTokenAccount = getAssociatedTokenAddressSync(tokenMint, payer);
-  const payerNftAccount = getAssociatedTokenAddressSync(nftMint.publicKey, payer);
-  const [metadata] = metadataPda(nftMint.publicKey);
-  const [masterEdition] = masterEditionPda(nftMint.publicKey);
+  const payerNftAccount = getAssociatedTokenAddressSync(nftMint, payer);
+  const [metadata] = metadataPda(nftMint);
+  const [masterEdition] = masterEditionPda(nftMint);
   // MCC accounts:
   const [collectionAuthority] = collectionAuthorityPda();
   const [collectionMetadata] = metadataPda(collectionMint);
@@ -222,7 +235,7 @@ export async function wrapBull(
       payer,
       payerTokenAccount,
       tokenMint,
-      nftMint: nftMint.publicKey,
+      nftMint,
       nftMintAuthority: vaultAuthority,
       vault,
       payerNftAccount,
@@ -240,10 +253,9 @@ export async function wrapBull(
       rent: SYSVAR_RENT_PUBKEY,
     })
     .preInstructions([CU_BUMP])
-    .signers([nftMint])
     .rpc();
 
-  return { signature: sig, tier, nftMint: nftMint.publicKey };
+  return { signature: sig, tier, nftMint };
 }
 
 export interface UnwrapResult {
