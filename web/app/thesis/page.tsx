@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function ThesisPage() {
   return (
-    <main className="max-w-2xl mx-auto px-6 py-20 md:py-28">
+    <main className="max-w-2xl mx-auto px-4 sm:px-6 py-20 md:py-28">
       <header className="mb-20">
         <div className="text-xs uppercase tracking-[0.25em] text-[var(--bull-dim)] mb-4">
           The thesis
@@ -23,7 +23,7 @@ export default function ThesisPage() {
       <Section n="01">
         Pump.fun ships clean, bare SPL tokens. Bonding curve, graduation to
         PumpSwap, creator fees. What it doesn't ship is any NFT primitive.
-        The hybrid token-NFT mechanic on Solana &mdash; SPL-404 &mdash;
+        The hybrid token-NFT mechanic on Solana - SPL-404 - 
         requires Token-2022, which is incompatible with the classic SPL
         tokens pump.fun launches. Every existing hybrid project had to
         leave the launchpad to work. The constraint nobody had solved: how
@@ -53,7 +53,7 @@ export default function ThesisPage() {
         The result: the first hybrid token-NFT layer that works on
         pump.fun-launched memecoins. 1,000 max supply. 1,000,000 $BULLS
         per bull. 100% on-chain pixel art. Same launchpad you already use,
-        same PumpSwap graduation, same wallet UX &mdash; with a native NFT
+        same PumpSwap graduation, same wallet UX - with a native NFT
         primitive on top of the standard token.
       </Section>
 

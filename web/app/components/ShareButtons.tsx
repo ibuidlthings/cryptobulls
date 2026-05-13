@@ -11,7 +11,7 @@ export default function ShareButtons({ tier, bodyName }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
 
   const url = typeof window !== "undefined" ? `${window.location.origin}/bull/${tier}` : `https://cryptobulls.fun/bull/${tier}`;
-  const tweetText = `CryptoBulls #${tier} — a ${bodyName} bull holding 1,000,000 $BULLS. The vault follows the NFT. 🐂`;
+  const tweetText = `CryptoBulls #${tier} - a ${bodyName} bull holding 1,000,000 $BULLS. The vault follows the NFT. 🐂`;
   const tweetIntent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(url)}`;
 
   async function copyLink() {

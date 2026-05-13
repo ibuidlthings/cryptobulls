@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-16">
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="h1 mb-6">About <span style={{ color: "var(--bull-accent)" }}>CryptoBulls</span></h1>
 
       <section className="prose-block">
@@ -67,6 +67,55 @@ export default function AboutPage() {
           <li><span className="text-[var(--bull-accent)] font-bold">→ Creator revenue.</span> 0.3% of bonding-curve volume + up to 0.05% of PumpSwap volume - funds ops indefinitely.</li>
           <li><span className="text-[var(--bull-accent)] font-bold">→ Wallet support.</span> Standard SPL means every Solana wallet handles the token without custom integration work.</li>
         </ul>
+
+        <h2 className="h2 mb-4 mt-12">Creator rewards</h2>
+        <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
+          Pump.fun streams up to 0.05% of PumpSwap volume back to the token
+          creator as creator revenue share. For CryptoBulls, that revenue is
+          the project's operating budget and the lever we use to keep the
+          ecosystem alive after launch day. No new tokens get minted to fund
+          ops - the 1B $BULLS supply is fixed. Everything below comes
+          exclusively from creator rewards.
+        </p>
+        <p className="text-[var(--bull-dim)] leading-relaxed mb-4">
+          How those rewards get deployed:
+        </p>
+        <ul className="space-y-3 text-[var(--bull-dim)]">
+          <li>
+            <span className="text-[var(--bull-accent)] font-bold">→ Build forward.</span>{" "}
+            Fund development of the next layer on top of pump.fun - additional
+            hybrid mechanics for other Solana memes, marketplace integrations,
+            new NFT primitives, and infrastructure that the team finds useful
+            to ship. CryptoBulls is the first thing we built; it's not the
+            last.
+          </li>
+          <li>
+            <span className="text-[var(--bull-accent)] font-bold">→ Strengthen $BULLS.</span>{" "}
+            A portion of creator rewards goes back into the token itself via
+            on-market buybacks, time-locked treasury holdings, and periodic
+            burns. The exact mix is discretionary - the goal is fewer
+            circulating tokens chasing the same bulls, not a fixed schedule.
+          </li>
+          <li>
+            <span className="text-[var(--bull-accent)] font-bold">→ Marketing.</span>{" "}
+            Paid promotion, partnerships, content production, and creator
+            collaborations. Money spent on getting the project in front of
+            audiences who would actually like it.
+          </li>
+          <li>
+            <span className="text-[var(--bull-accent)] font-bold">→ Admin + activations.</span>{" "}
+            Marketplace listing fees and review applications, infrastructure
+            (RPC, hosting, monitoring), event sponsorships, and on-the-ground
+            activations that turn online attention into real interactions.
+          </li>
+        </ul>
+        <p className="text-xs text-[var(--bull-dim)] italic mt-4">
+          None of this is a contractual commitment, return promise, or yield
+          mechanism. Creator rewards are the founder's operating capital,
+          spent at the team's discretion in service of the project's
+          long-term health. Holders should hold $BULLS for the mechanic, not
+          for a buyback schedule.
+        </p>
 
         <h2 className="h2 mb-4 mt-12">Status</h2>
         <ul className="space-y-2 text-[var(--bull-dim)]">

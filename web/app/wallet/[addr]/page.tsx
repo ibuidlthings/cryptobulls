@@ -1,4 +1,4 @@
-// /wallet/[addr] — show a wallet's bulls + loose $BULLS balance.
+// /wallet/[addr] - show a wallet's bulls + loose $BULLS balance.
 // Reads chain directly. Server-rendered (no wallet adapter needed; works for any pubkey).
 
 import Link from "next/link";
@@ -138,7 +138,7 @@ export default async function WalletPage({
   const state = await loadWalletState(conn, addr);
   if (!state) {
     return (
-      <main className="max-w-3xl mx-auto px-6 py-16">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
         <h1 className="h1 mb-4">Wallet</h1>
         <p className="text-[var(--bull-dim)]">
           Bank not initialized yet. Cannot enumerate bulls.

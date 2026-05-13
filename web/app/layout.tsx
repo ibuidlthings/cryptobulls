@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   icons: { icon: "/mascot.png" },
   other: {
-    // Solana ecosystem signals — what wallet/marketplace crawlers look for
+    // Solana ecosystem signals - what wallet/marketplace crawlers look for
     // when deciding whether a dApp is trustworthy enough to allow connect.
     "solana:network": "mainnet-beta",
     "solana:program-id": "A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm",

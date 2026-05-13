@@ -34,6 +34,8 @@ export interface BullBank {
   freeTiers: number[];
   authority: PublicKey;
   bump: number;
+  // MCC: Pubkey::default() until initialize_collection runs.
+  collectionMint: PublicKey;
 }
 
 export function getProgramId(): PublicKey {
@@ -113,6 +115,10 @@ export async function fetchBullBank(
   const authority = new PublicKey(d.slice(off, off + 32));
   off += 32;
   const bump = d.readUInt8(off);
+  off += 1;
+  // MCC: 32 bytes of collection_mint, carved from the original 64-byte
+  // reserved block. Pre-MCC banks have all zeros (Pubkey::default()).
+  const collectionMint = new PublicKey(d.slice(off, off + 32));
   return {
     tokenMint,
     totalWrapped,
@@ -122,5 +128,6 @@ export async function fetchBullBank(
     freeTiers,
     authority,
     bump,
+    collectionMint,
   };
 }

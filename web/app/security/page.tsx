@@ -14,7 +14,7 @@ export const dynamic = "force-static";
 
 export default function SecurityPage() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-16">
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="h1 mb-3">Security &amp; transparency</h1>
       <p className="text-[var(--bull-dim)] text-lg mb-10">
         Everything a wallet review team or curious user needs to verify what
@@ -26,7 +26,7 @@ export default function SecurityPage() {
           A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm
         </Field>
         <Field label="Network">
-          Solana — currently devnet for testing, mainnet at launch
+          Solana - currently devnet for testing, mainnet at launch
         </Field>
         <Field label="Token mint">
           Set per-deployment in the BullBank PDA. View on chain via the
@@ -47,23 +47,23 @@ export default function SecurityPage() {
         <ul className="list-disc list-inside space-y-2 text-[var(--bull-dim)]">
           <li>
             <span className="text-[var(--bull-ink)] font-bold">initialize</span>{" "}
-            — one-time bank setup at deploy. Locks the $TOKEN mint address.
+            - one-time bank setup at deploy. Locks the $TOKEN mint address.
           </li>
           <li>
             <span className="text-[var(--bull-ink)] font-bold">initialize_collection</span>{" "}
-            — one-time creation of the Metaplex Certified Collection NFT.
+            - one-time creation of the Metaplex Certified Collection NFT.
           </li>
           <li>
             <span className="text-[var(--bull-ink)] font-bold">wrap_bull</span>{" "}
-            — moves 1,000,000 $BULLS from the caller into a vault PDA, mints
+            - moves 1,000,000 $BULLS from the caller into a vault PDA, mints
             them a fresh NFT, verifies the NFT into the collection. Caller
             is the only signer.
           </li>
           <li>
             <span className="text-[var(--bull-ink)] font-bold">unwrap_bull</span>{" "}
-            — burns the caller's bull NFT and returns 1,000,000 $BULLS from
+            - burns the caller's bull NFT and returns 1,000,000 $BULLS from
             the vault to the caller. The caller must hold the NFT in their
-            ATA. Permissionless — anyone holding a bull can unwrap it.
+            ATA. Permissionless - anyone holding a bull can unwrap it.
           </li>
         </ul>
         <p className="mt-4 text-sm text-[var(--bull-dim)]">
@@ -109,7 +109,7 @@ export default function SecurityPage() {
         <ul className="list-disc list-inside space-y-2 text-[var(--bull-dim)]">
           <li>Reads on-chain state via Solana RPC (Helius)</li>
           <li>Builds wrap_bull / unwrap_bull instructions in the browser</li>
-          <li>Asks your wallet to sign — every action is your signature</li>
+          <li>Asks your wallet to sign - every action is your signature</li>
           <li>
             Does <span className="text-[var(--bull-ink)] font-bold">not</span>{" "}
             request any token approval, account delegation, or sign-and-broadcast

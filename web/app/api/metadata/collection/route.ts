@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     description:
       "CryptoBulls is a hybrid token-NFT layer for pump.fun-launched " +
       "memecoins. Each bull NFT locks 1,000,000 $BULLS in a vault PDA " +
-      "whose authority is derived from the NFT's mint address — sell the " +
+      "whose authority is derived from the NFT's mint address - sell the " +
       "NFT, the tokens follow. Tradeable on Magic Eden and Tensor; " +
       "unwrap any time to redeem the underlying $BULLS.",
     image,

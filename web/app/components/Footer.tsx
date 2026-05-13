@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Footer() {
   return (
     <footer className="border-t border-[#1a1a22] mt-20">
-      <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row justify-between gap-6 text-sm text-[var(--bull-dim)]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col md:flex-row justify-between gap-6 text-sm text-[var(--bull-dim)]">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <img src="/mascot.png" alt="" width={24} height={24} className="pixelated rounded" />
@@ -22,6 +22,7 @@ export default function Footer() {
             <div className="text-[var(--bull-ink)] font-bold text-xs uppercase tracking-wider mb-1">Learn</div>
             <Link href="/thesis" className="hover:text-[var(--bull-accent)]">Thesis</Link>
             <Link href="/tech" className="hover:text-[var(--bull-accent)]">How it works</Link>
+            <Link href="/art" className="hover:text-[var(--bull-accent)]">Art</Link>
             <Link href="/about" className="hover:text-[var(--bull-accent)]">About</Link>
           </div>
           <div className="flex flex-col gap-1">

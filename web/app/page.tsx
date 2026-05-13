@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { fetchBullBank, getConnection, getCluster } from "@/lib/chain";
+import { isPreLaunch, getTokenMint } from "@/lib/launch-state";
 import RecentlyWrapped from "./components/RecentlyWrapped";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,13 @@ async function loadStats() {
 }
 
 export default async function HomePage() {
-  const stats = await loadStats();
+  const preLaunch = isPreLaunch();
+  // In pre-launch mode, never read or expose chain stats (avoids leaking
+  // devnet test state to the public).
+  const stats = preLaunch ? null : await loadStats();
   const cluster = getCluster();
-  const featuredTiers = stats && stats.inCirculation > 0
+  const tokenMint = getTokenMint();
+  const featuredTiers = !preLaunch && stats && stats.inCirculation > 0
     ? Array.from({ length: Math.min(stats.inCirculation, 6) }, (_, i) => i + 1)
     : [];
 
@@ -31,11 +36,13 @@ export default async function HomePage() {
     <main>
       {/* HERO */}
       <section className="relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-2 gap-10 items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 md:pt-20 pb-16 md:pb-24 grid md:grid-cols-2 gap-10 items-center">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-[#15151a] border border-[#2a2a32] mb-6">
-              <span className="w-2 h-2 rounded-full bg-[var(--bull-success)] animate-pulse" />
-              <span className="text-[var(--bull-dim)]">{cluster.toUpperCase()} · Program live</span>
+              <span className={`w-2 h-2 rounded-full ${preLaunch ? "bg-[var(--bull-accent)]" : "bg-[var(--bull-success)]"} animate-pulse`} />
+              <span className="text-[var(--bull-dim)]">
+                {preLaunch ? "Launching soon" : `${cluster.toUpperCase()} · Program live`}
+              </span>
             </div>
             <h1 className="h1 mb-5">
               Pump.fun, <span style={{ color: "var(--bull-accent)" }}>upgraded.</span>
@@ -46,21 +53,43 @@ export default async function HomePage() {
               tradeable Bull NFT. The vault follows the NFT through every marketplace transfer.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/wrap" className="btn btn-primary">Wrap a Bull →</Link>
-              <Link href="/tech" className="btn btn-secondary">How it works</Link>
+              {preLaunch ? (
+                <>
+                  <Link href="/tech" className="btn btn-primary">How it works</Link>
+                  <Link href="/art" className="btn btn-secondary">See the art</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/wrap" className="btn btn-primary">Wrap a Bull →</Link>
+                  <Link href="/tech" className="btn btn-secondary">How it works</Link>
+                </>
+              )}
             </div>
+            {tokenMint && (
+              <div className="mt-6 inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#15151a] border border-[#2a2a32] text-xs">
+                <span className="text-[var(--bull-dim)]">$BULLS:</span>
+                <span className="font-mono text-[var(--bull-ink)] break-all">{tokenMint}</span>
+                <a
+                  href={`https://pump.fun/${tokenMint}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-[var(--bull-accent)] hover:underline shrink-0"
+                >
+                  pump.fun ↗
+                </a>
+              </div>
+            )}
             <div className="mt-8 text-xs text-[var(--bull-dim)]">
               Same launchpad. Same PumpSwap graduation. Native NFT primitive.
             </div>
           </div>
           <div className="flex justify-center md:justify-end">
-            <div className="relative">
+            <div className="relative w-[60vw] max-w-[400px] aspect-square">
               <div className="absolute inset-0 bg-[var(--bull-accent)] blur-3xl opacity-20" />
               <img
                 src="/mascot.png"
                 alt="CryptoBulls mascot"
-                className="pixelated rounded-2xl border-2 border-[#2a2a32] relative z-10 shadow-2xl"
-                style={{ width: 400, height: 400 }}
+                className="pixelated rounded-2xl border-2 border-[#2a2a32] relative z-10 shadow-2xl w-full h-full object-cover"
               />
             </div>
           </div>
@@ -86,26 +115,50 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* STATS */}
-      <section className="section">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="h2 mb-8">Live on-chain</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="In circulation" value={stats?.inCirculation ?? "-"} sub="bulls right now" />
-            <Stat label="Total wrapped" value={stats?.totalWrapped ?? "-"} sub="lifetime" />
-            <Stat label="Total unwrapped" value={stats?.totalUnwrapped ?? "-"} sub="redeemed" />
-            <Stat label="Next tier" value={`#${stats?.nextTier ?? "-"}`} sub="up for grabs" />
-          </div>
-        </div>
-      </section>
+      {/* STATS / FEED — only when live */}
+      {!preLaunch && (
+        <>
+          <section className="section">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+              <h2 className="h2 mb-8">Live on-chain</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Stat label="In circulation" value={stats?.inCirculation ?? "-"} sub="bulls right now" />
+                <Stat label="Total wrapped" value={stats?.totalWrapped ?? "-"} sub="lifetime" />
+                <Stat label="Total unwrapped" value={stats?.totalUnwrapped ?? "-"} sub="redeemed" />
+                <Stat label="Next tier" value={`#${stats?.nextTier ?? "-"}`} sub="up for grabs" />
+              </div>
+            </div>
+          </section>
+          <RecentlyWrapped />
+        </>
+      )}
 
-      {/* RECENTLY WRAPPED (auto-polling client-side; hidden if no wraps) */}
-      <RecentlyWrapped />
+      {/* PRE-LAUNCH TEASER (replaces live stats + feed before launch) */}
+      {preLaunch && (
+        <section className="section">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+            <div className="text-xs uppercase tracking-[0.25em] text-[var(--bull-dim)] mb-4">
+              Pre-launch
+            </div>
+            <h2 className="h2 mb-4">Goes live when $BULLS launches on pump.fun.</h2>
+            <p className="text-[var(--bull-dim)] leading-relaxed mb-8">
+              The wrap, unwrap, and gallery activate the moment the token mints
+              and the program is initialized. Until then, dig into the tech and
+              the art - everything is open source.
+            </p>
+            <div className="flex justify-center gap-3 flex-wrap">
+              <Link href="/thesis" className="btn btn-primary">Read the thesis</Link>
+              <Link href="/art" className="btn btn-secondary">See the art</Link>
+              <Link href="/tech" className="btn btn-secondary">Tech walkthrough</Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* FEATURED BULLS */}
       {featuredTiers.length > 0 && (
         <section className="section pt-0">
-          <div className="max-w-6xl mx-auto px-6">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <div className="flex items-end justify-between mb-6">
               <h2 className="h2">The herd</h2>
               <Link href="/gallery" className="btn btn-ghost text-sm">View all →</Link>
@@ -127,7 +180,7 @@ export default async function HomePage() {
 
       {/* HOW IT WORKS */}
       <section className="section bg-[#0e0e12] border-y border-[#1a1a22]">
-        <div className="max-w-6xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 className="h2 mb-2">How it works</h2>
           <p className="text-[var(--bull-dim)] mb-10 text-lg">Three steps. Fully on-chain. No middleman.</p>
           <div className="grid md:grid-cols-3 gap-6">
@@ -143,7 +196,7 @@ export default async function HomePage() {
 
       {/* WHY IT'S NOVEL */}
       <section className="section">
-        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-10 items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10 items-center">
           <div>
             <h2 className="h2 mb-4">First of its kind</h2>
             <p className="text-[var(--bull-dim)] text-lg leading-relaxed mb-4">
@@ -177,7 +230,7 @@ export default async function HomePage() {
 
       {/* CTA */}
       <section className="section pt-0">
-        <div className="max-w-6xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="card text-center py-12">
             <h2 className="h2 mb-3">Ready to wrap?</h2>
             <p className="text-[var(--bull-dim)] text-lg mb-6">

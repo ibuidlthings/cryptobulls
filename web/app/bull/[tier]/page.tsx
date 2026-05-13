@@ -54,7 +54,7 @@ export default async function BullPage({ params }: BullPageContext) {
   const explorerCluster = cluster === "mainnet-beta" ? "" : `?cluster=${cluster}`;
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-16">
+    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-16">
       <Link href="/gallery" className="btn btn-ghost text-sm mb-8 -ml-2">← Back to gallery</Link>
 
       <div className="grid md:grid-cols-2 gap-10">
