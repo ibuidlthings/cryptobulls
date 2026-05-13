@@ -82,20 +82,23 @@ Tech walkthrough: [TECH_WALKTHROUGH.md](TECH_WALKTHROUGH.md).
 │   ├── app/
 │   │   ├── page.tsx              Landing
 │   │   ├── thesis/page.tsx       The thesis statement
-│   │   ├── tech/page.tsx         Long-form mechanic doc
+│   │   ├── tech/page.tsx         Long-form mechanic doc + rarity model
 │   │   ├── about/page.tsx        Project background
+│   │   ├── art/page.tsx          Trait gallery, math, five-tier rarity bands
 │   │   ├── gallery/page.tsx      Live grid of every wrapped bull
 │   │   ├── bull/[tier]/page.tsx  NFT detail page
 │   │   ├── wrap/page.tsx         Wallet-connected wrap UI
 │   │   ├── unwrap/page.tsx       Wallet-connected unwrap UI
+│   │   ├── security/page.tsx     Security model
 │   │   └── api/
-│   │       ├── metadata/[tier]/route.ts  Metaplex JSON
-│   │       └── render/[tier]/route.ts    PNG (default) or SVG
+│   │       ├── metadata/[tier]/route.ts        Per-bull Metaplex JSON
+│   │       ├── metadata/collection/route.ts    Collection NFT metadata (MCC parent)
+│   │       └── render/[tier]/route.ts          PNG (default) or SVG
 │   ├── lib/
 │   │   ├── chain.ts            Lightweight on-chain account reader
-│   │   ├── program.ts          Anchor client + wrap/unwrap helpers
+│   │   ├── program.ts          Anchor client + explicit build→simulate→sign→send wrap/unwrap helpers (Phantom-compliant)
 │   │   ├── renderer.mjs        Mirror of cranker/src/renderer.mjs
-│   │   └── idl.json            Anchor program IDL
+│   │   └── idl.json            Anchor program IDL (with MCC fields)
 │   └── public/mascot.png
 │
 ├── scripts/               Devnet deploy + E2E test scripts
@@ -149,12 +152,15 @@ The chain reader is configured for devnet by default (env: `NEXT_PUBLIC_PROGRAM_
 
 ## Status
 
-- [x] Anchor program complete (initialize / wrap_bull / unwrap_bull)
+- [x] Anchor program complete (initialize / wrap_bull / unwrap_bull / initialize_collection)
 - [x] Full anchor test suite passing (including the critical vault-follows-NFT proof)
-- [x] Devnet deployed: `A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm`
-- [x] Live website at [cryptobulls.fun](https://cryptobulls.fun) with wrap/unwrap UI
-- [x] On-chain metadata + render API serving CryptoBulls #1
-- [ ] Mainnet program deploy
+- [x] Devnet **and mainnet** deployed: `A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm`
+- [x] **Metaplex Certified Collection** (MCC) live — Magic Eden / Tensor / Phantom recognise the collection
+- [x] **Single-signer wrap_bull** (`nft_mint` is a PDA derived from `["nft_mint", bank.total_wrapped]`) so Phantom's Lighthouse can simulate cleanly without multi-signer warnings
+- [x] Live website at [cryptobulls.fun](https://cryptobulls.fun): wrap/unwrap UI, /gallery, /bull/[tier], /art (trait gallery + rarity math), /thesis, /tech, /security
+- [x] Explicit `build → simulate → sign → send` client flow implementing all 4 mitigations from [Phantom's docs](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings) — see [`web/lib/program.ts`](web/lib/program.ts) (`buildSignSimulateSend`)
+- [x] On-chain metadata + render API serving live bulls
+- [x] 23 active accessory traits including **Pump** and **Phantom** (Rare tier additions)
 - [ ] $BULLS launch on pump.fun
 - [ ] Helius webhook + indexer for live activity feed
 - [ ] Auto-wrap via SPL delegate (v2)

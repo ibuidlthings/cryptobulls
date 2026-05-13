@@ -294,9 +294,21 @@ Combine these with pump.fun's launchpad and PumpSwap, and you have a hybrid toke
 - **Horn:** ivory, dark, gold, crimson, silver
 - **Eye:** normal, golden, void, green, closed, angry, crying, ski_mask
 - **Background:** pasture, sand, sunset, chart, void, sky, crimson
-- **Accessory:** bell, gold_chain, cowboy_hat, dubai_hat, strawberry_hat, apple, crown, halo, diamond_aura, fire_aura, beanie, tinfoil, headband, mohawk, top_hat, sheriff_hat, tiara, halo_stars, earring, scar
-- **Eyewear:** mog, sunglasses_classic, clout_shades, thug_life, 3d_glasses, lasers
-- **Mouth:** cigarette, grill, smug, bubblegum, smile, frown, tongue_out, open_shout
+- **Accessory** (23 active): bell, gold_chain, cowboy_hat, dubai_hat, strawberry_hat, apple, crown, halo, diamond_aura, fire_aura, beanie, tinfoil, headband, mohawk, top_hat, sheriff_hat, tiara, halo_stars, earring, scar, **Pump**, **Phantom**
+- **Eyewear** (6 active, excluding "none"): mog, sunglasses_classic, clout_shades, thug_life, 3d_glasses, lasers
+- **Mouth** (6 active, excluding "none"): cigarette, grill, bubblegum, frown, tongue_out, open_shout
+
+**Five-tier rarity model** (per-item drop rates across all categories; exact rates vary per category because each has its own weight sum):
+
+| Tier | Per-item rate | Examples |
+|---|---|---|
+| Common | 22–68% | brown body, ivory horns, normal eyes, pasture/sand bg, "none" for accessory / eyewear / mouth |
+| Uncommon | 5–18% | white/red body, dark/gold horns, closed/angry eyes, sky/sunset bg, bell, cowboy_hat, sunglasses, 3d_glasses, frown |
+| Rare | 2.7–12% | golden/cyan/pink body, crimson/silver horns, crying eyes, chart bg, top_hat, mohawk, tiara, Pump, Phantom, mog, thug_life |
+| Epic | 1.8–4% | zombie body, void/gold/green eyes, void bg, fire_aura, diamond_aura, halo, scar, dubai_hat, lasers, grill |
+| Legendary | ~1% (1/99 to 1/110) | holo body, ski_mask eyes, halo_stars accessory |
+
+Active-combination math: 9 (body) × 5 (horn) × 8 (eye) × 7 (bg) × 23 (accessory) × 7 (eyewear) × 7 (mouth) = **2,840,040** unique combinations. Live breakdown + per-trait visuals: [cryptobulls.fun/art](https://cryptobulls.fun/art).
 
 **Cultural references woven in:** ERC-404 (Pandora), SPL-404 (Mutantmon, Mall Street, Flyffys), CryptoPunks (beanie, top_hat, mohawk, tiara, earring), Moonbirds (diamond_aura, fire_aura), Remilio (clout_shades, dubai_hat), Milady (strawberry_hat), Pudgy Penguins (swag).
 
