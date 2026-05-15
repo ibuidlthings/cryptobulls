@@ -1,4 +1,16 @@
 #!/bin/bash
+# ============================================================================
+# ⚠️  DEPRECATED — DO NOT RUN. Superseded 2026-05-15.
+# Encodes the WRONG deployer (EXPECTED_DEPLOYER=FRZJ…TwQ; the real deployer
+# is GMrJpP7Sa…, the bulls-box keypair) and the disproved Phantom-whitelist
+# root-cause model. Launch is now the MANUAL sequence in
+# docs/LAUNCH_RUNBOOK.md + docs/LAUNCH_CHECKLIST.md. Fails closed below.
+# Intentional override (not advised): set I_KNOW_THIS_IS_DEPRECATED=1.
+if [ "${I_KNOW_THIS_IS_DEPRECATED:-0}" != "1" ]; then
+  echo "DEPRECATED: use docs/LAUNCH_RUNBOOK.md (manual sequence). Aborting." >&2
+  exit 1
+fi
+# ============================================================================
 # Mainnet launch sequence for CryptoBulls.
 #
 # Usage:

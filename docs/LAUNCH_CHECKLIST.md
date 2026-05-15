@@ -1,124 +1,151 @@
-# Mainnet launch checklist
+# Launch Checklist — Shared Runsheet (You ↔ Claude)
 
-Single source of truth for everything that has to be true before we run
-`scripts/launch.sh` on mainnet. Update as items complete.
+**Authoritative.** Companion to [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md)
+(exact commands). This is the **who-does-what, in-what-order** runsheet so
+launch is mechanical and nothing is skipped. Decisions locked 2026-05-15:
+**deployer = `GMrJpP7Sa…` (bulls-box keypair); launch = manual runbook
+sequence.** Treasury/creator `FRZJ…TwQ` receives royalties and signs
+nothing.
 
-## Phase 0 — Pending external approvals
+Owner tags: **YOU** = Louie · **ME** = Claude. `🔒 GATE` = hard stop;
+do not proceed until verified.
 
-- [x] Submit Phantom dApp review form (Google form, 2026-05-09 12:58 PT)
-- [ ] **Phantom whitelist confirmation received** (24–72h window;
-  72h mark = 2026-05-12 ~1pm PT). Until this resolves, mainnet wrap +
-  unwrap tx-sign prompts show "Request blocked - This dApp could be
-  malicious" with a "Proceed anyway (unsafe)" option.
-  - 2026-05-11 morning: wallet-connect on fresh mobile Phantom passed
-    cleanly (no banner on connect prompt).
-  - 2026-05-11 afternoon: wrap tx-sign on desktop Phantom (deployer
-    wallet, devnet) STILL shows the red banner. The Blowfish tx-level
-    check has not cleared yet.
-  - Conclusion: connect layer may be partially cleared; tx-sign layer
-    is not. Wait for full clear OR plan to launch with the warning
-    showing (power users can hit "Proceed anyway").
+> ⚠️ **Superseded — DO NOT USE:** `scripts/launch.sh`,
+> `scripts/launch_preflight.sh`, `scripts/web_apply_mcc.sh` and the old
+> Phantom-whitelist-form / "fund FRZJ…TwQ to deploy" model. They encode the
+> wrong deployer and a root-cause theory we disproved. The runbook + this
+> checklist replace them. Treat any other `docs/*.md` that says "fund
+> FRZJ…TwQ with SOL to deploy" or "wait for Phantom whitelist" as stale.
 
-### Backup posture (done 2026-05-11)
-- [x] Mainnet deployer keypair backed up
-- [x] DigitalOcean weekly snapshots enabled (Sundays)
+---
 
-## Phase 1 — Trust signals on the live site (done 2026-05-09)
+## Phase 0 — Pre-launch (NOW → before $BULLS exists). State: safe.
 
-These improve the chance Phantom's reviewer marks us legitimate.
+- [x] ME — Program audited; 5% royalty + creator `FRZJ…TwQ` baked in;
+      12/12 anchor tests pass incl. `assertRoyalty` (proven on-chain).
+- [x] ME — Client tx flow, metadata/render API, RPC scaling hardened.
+- [x] ME — Runbook + this checklist + README + memory consistent with code.
+- [ ] ME — Deprecation banners on the superseded scripts (so they can't be
+      run by mistake at launch).
+- [ ] YOU — *(Optional, recommended, zero-risk)* local devnet rehearsal:
+      `cd web && npm run dev` → `localhost:3000/wrap`, Phantom on Devnet,
+      fund test wallet (`solana airdrop 2 <addr> -u devnet`) + devnet
+      $BULLS, click Wrap. Expect clean modal, Advanced shows
+      `bullpeg: wrapBull`, console `simulationErr: null`, NFT appears.
+      Clean here → program/tx confirmed; any later mainnet warning is
+      domain-rep only.
+- [ ] YOU — *(Optional)* add a Bash force-push permission rule in Claude
+      Code settings if you want the cosmetic `@` subject of commit
+      `14cfe2e` fixed. No functional impact; skipping is fine.
+- [ ] YOU — Ensure you can fund deployer `GMrJpP7Sa…` with ~5 SOL on
+      mainnet at launch, and that you control treasury `FRZJ…TwQ`.
 
-- [x] `<meta name="solana:network">`, `solana:program-id`, `dapp:source`,
-      `dapp:twitter` published in [layout.tsx](../web/app/layout.tsx)
-- [x] `/security` transparency page live at
-      [cryptobulls.fun/security](https://cryptobulls.fun/security)
-- [x] `/.well-known/security.txt` published with GitHub + X contact paths
-- [x] Caddy emits `Strict-Transport-Security`, `X-Content-Type-Options`,
-      `Referrer-Policy`, `Permissions-Policy` (HSTS preload-eligible, 1y)
-- [x] SSL valid May 8 → Aug 6 2026 (Caddy auto-renews 30 days early)
-- [x] Source code public on `github.com/ibuidlthings/cryptobulls`
+🔒 **GATE 0:** Do not start Phase 1 until $BULLS is live on pump.fun and
+you have the real mint address.
 
-## Phase 2 — Pre-launch automation (now done)
+---
 
-Tooling that was missing earlier:
+## Phase 1 — Token launch + handoff (YOU trigger)
 
-- [x] [`scripts/launch_preflight.sh`](../scripts/launch_preflight.sh) —
-      validates 12 pre-flight checks (tools, repo layout, keypair
-      match, balance, MCC readiness, DNS, TLS) without changing state
-- [x] [`scripts/web_apply_mcc.sh`](../scripts/web_apply_mcc.sh) —
-      swaps the live web client to MCC-aware (IDL + program.ts +
-      chain.ts + wrap/unwrap pages), rebuilds Next.js, syncs to
-      `/opt/cryptobulls-web`, restarts service
-- [x] [`web/lib/program.ts.mcc`](../web/lib/program.ts.mcc) +
-      [`web/lib/chain.ts.mcc`](../web/lib/chain.ts.mcc) — full MCC-aware
-      alternates, ready to swap
-- [x] `launch.sh` Step 0.5 — auto-calls `web_apply_mcc.sh` if the
-      live client is still pre-MCC (one-command launch)
+- [ ] YOU — Launch $BULLS on pump.fun.
+- [ ] YOU — Send me: (a) the **$BULLS mint address**, (b) explicit
+      "it's live, proceed."
+- [ ] ME — Verify on mainnet: real SPL mint, 6 decimals, mint authority
+      null. Report before touching anything.
 
-**No more manual web edits needed at launch time.** `launch.sh` handles
-the swap.
+🔒 **GATE 1:** Mint verified real. A wrong/placeholder mint must NEVER
+reach `initialize` — it locks permanently.
 
-## Phase 3 — Mainnet deploy (launch day)
+---
 
-User actions:
+## Phase 2 — Mainnet deploy (ME executes, YOU fund)
 
-- [ ] Fund `FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ` with **5.5 SOL**
-      mainnet
-- [ ] `scp` the mainnet deployer keypair to `/tmp/mainnet-deployer.json`
-      on the bulls box (`165.22.167.96`)
-- [ ] Launch `$BULLS` on pump.fun, copy the mint address
-- [ ] Run preflight on bulls box:
-      ```
-      DEPLOYER_KEYPAIR=/tmp/mainnet-deployer.json \
-        /root/bullpeg-sol/scripts/launch_preflight.sh <BULLS_MINT_ADDRESS>
-      ```
-      Must report 0 fails before continuing.
-- [ ] Run launch on bulls box:
-      ```
-      DEPLOYER_KEYPAIR=/tmp/mainnet-deployer.json \
-        /root/bullpeg-sol/scripts/launch.sh <BULLS_MINT_ADDRESS>
-      ```
-- [ ] `shred -u /tmp/mainnet-deployer.json` (mainnet keypair off the box)
+- [ ] YOU — Fund deployer `GMrJpP7SaUkfyizsB3b8GeKWgDiqac3g5EaMGnMtkXCj`
+      (= bulls-box `/root/.config/solana/id.json`) with ~5 SOL mainnet.
+      Tell me when done. *(NOT FRZJ…TwQ.)*
+- [ ] ME — `anchor build` on the box from the royalty-bearing source;
+      confirm `bullpeg.so` + `bullpeg.json` fresh, 0 errors.
+- [ ] ME — `anchor deploy --provider.cluster mainnet-beta`; verify
+      `solana program show` → Executable: true, authority `GMrJpP7Sa…`.
+- [ ] ME — `anchor idl init` on mainnet; verify `anchor idl fetch` returns
+      the bullpeg IDL (kills "Unknown program").
+- [ ] ME — `initialize` (locks real $BULLS mint) + `initialize_collection`
+      (MCC). Triple-check the mint string before running `initialize`.
 
-`launch.sh` handles automatically:
+🔒 **GATE 2:** Program executable on mainnet, IDL published, bank
+initialized with the correct mint, MCC created. I verify via on-chain reads.
 
-- [x] Step 0: pre-flight (deployer match, balance, build artifact,
-      Anchor.toml alignment)
-- [x] Step 0.5: web client MCC swap + rebuild + sync
-- [x] Step 1: deploy program to mainnet (idempotent)
-- [x] Step 2: `initialize` with `<BULLS_MINT>` (idempotent)
-- [x] Step 2.5: `initialize_collection` (idempotent)
-- [x] Step 3: switch systemd env from devnet → mainnet RPC + restart
-- [x] Smoke-test `/` and `/api/health`
+---
 
-## Phase 4 — Post-launch verification
+## Phase 3 — Site flip to live (ME executes)
 
-- [ ] Wallet connect on mainnet works (no Phantom red banner)
-- [ ] Founder bull wrap (you wrap CryptoBulls #1 from dev-buy supply)
-- [ ] `/api/health` returns `ok: true` with mainnet slot
-- [ ] [audit_chain.sh](../scripts/audit_chain.sh) — all 7 invariants pass
-- [ ] Tensor shows the collection (may take 24h to index)
-- [ ] Magic Eden shows the collection (may take 24h to index)
-- [ ] Tweet per [docs/COMMS.md](COMMS.md) cadence
+- [ ] ME — Repoint `web/.env.production` + systemd: `LAUNCH_STATE=live`,
+      mainnet cluster, real program id + token mint, systemd
+      `SOLANA_RPC_URL` → Helius **mainnet** endpoint. Confirm no
+      `.env.local` exists on the build machine (only `.env.development.local`).
+- [ ] ME — Rebuild, redeploy, `daemon-reload`, restart `cryptobulls-web`.
+- [ ] ME — Verify homepage drops "Launching soon", `/wrap` shows live UI,
+      `/api/metadata/1` + `/api/render/1` return 200 on mainnet.
 
-## Risks + mitigations
+🔒 **GATE 3:** Site live on mainnet, serving without errors.
 
-| Risk | Mitigation |
-|---|---|
-| Phantom rejects whitelist | Reply with extra info; worst case launch with the warning, get it cleared post-launch via reviewer feedback |
-| Mainnet deploy fails midway | `launch.sh` is idempotent; see [`docs/RECOVERY.md`](RECOVERY.md) Scenario 1 for per-step recovery steps |
-| Web MCC swap breaks build | `launch.sh` Step 0.5 fails before any chain ops; revert via `git checkout web/lib && rebuild`. See [`RECOVERY.md`](RECOVERY.md) Scenario 1 |
-| Magic Eden / Tensor don't index | Auto-indexed via MCC; full listing requires Creator Hub claim — see [`MARKETPLACE.md`](MARKETPLACE.md) |
-| Bulls box dies | DO snapshots restore in 10–20 min if enabled; full rebuild documented in [`RECOVERY.md`](RECOVERY.md) Scenario 2 |
-| Deployer keypair lost | **Pre-launch:** back up encrypted in 2+ locations + hardware/paper. See [`RECOVERY.md`](RECOVERY.md) "Deployer keypair" section |
-| Helius RPC outage | Fall back to public mainnet-beta RPC by editing systemd `SOLANA_RPC_URL` |
+---
 
-## Related docs
+## Phase 4 — Private verification (SHARED — the no-errors gate)
 
-- [`docs/RECOVERY.md`](RECOVERY.md) — incident playbook, asset backup posture
-- [`docs/MARKETPLACE.md`](MARKETPLACE.md) — Magic Eden + Tensor claim flow
-- [`docs/COMMS.md`](COMMS.md) — launch tweets + cadence
-- [`docs/AUTHORITY.md`](AUTHORITY.md) — upgrade authority freeze plan
-- [`scripts/launch_preflight.sh`](../scripts/launch_preflight.sh) — read-only validator
-- [`scripts/launch.sh`](../scripts/launch.sh) — main mainnet deploy script
-- [`scripts/web_apply_mcc.sh`](../scripts/web_apply_mcc.sh) — web client MCC swap
-- [`scripts/audit_chain.sh`](../scripts/audit_chain.sh) — 7-invariant on-chain audit
+**No public announcement until every item here is green.**
+
+- [ ] ME — One private wrap; read the new NFT's on-chain metadata:
+      `sellerFeeBasisPoints == 500`, creator `FRZJ…TwQ` share 100,
+      `collection.verified == true`. (Test-gated already; mainnet re-confirm.)
+- [ ] ME — Open the mint on Magic Eden + Tensor; image, traits,
+      "CryptoBulls" collection grouping resolve.
+- [ ] YOU — **Rehearsal:** with your wallet (≥1,000,000 $BULLS + ≥0.03
+      SOL) do ONE wrap on cryptobulls.fun on **Phantom-mainnet**. Expect:
+      no warning, Advanced shows `bullpeg: wrapBull`, tx confirms, NFT in
+      Phantom Collectibles. Screenshot the modal + send the
+      `[bullpeg-tx:wrapBull]` console object.
+- [ ] ME — Any warning/error → diagnose from your capture, fix, redeploy,
+      re-test. You do not announce until clean.
+
+🔒 **GATE 4:** Clean private mainnet wrap + royalty on-chain + NFT visible
+on both marketplaces. This is the "no errors at launch" guarantee.
+
+---
+
+## Phase 5 — Announce (YOU)
+
+- [ ] YOU — Announce only after GATE 4 fully green.
+- [ ] ME — Stand by during announce for live triage.
+
+---
+
+## Phase 6 — Post-launch monitoring (ME ongoing)
+
+- [ ] ME — Watch Helius RPC health (no `-32429`), metadata/render 200s
+      under marketplace crawl, `cryptobulls-web` uptime.
+- [ ] ME — Spot-check wrapped bulls on ME/Tensor as volume grows.
+- [ ] ME — Keep README/runbook/this checklist/memory reflecting live state.
+- [ ] YOU — Forward any user-reported wallet warning or mint failure with
+      screenshot + wallet; I triage same-day.
+
+---
+
+## Rollback (either of us can trigger)
+
+Set `NEXT_PUBLIC_LAUNCH_STATE=pre-launch` in `web/.env.production` +
+systemd, rebuild, redeploy, restart → wrap/unwrap revert to gated cards,
+no tx possible, no further domain-rep damage. Program is upgradeable
+(authority retained) so logic fixes ship via `anchor upgrade` without
+changing the program ID. Detail: runbook "Rollback".
+
+---
+
+## The only things ONLY you can do (rest is mine)
+
+1. **Launch $BULLS, send me the verified mint + "go."** (GATE 1)
+2. **Fund deployer `GMrJpP7Sa…` with mainnet SOL; do the private Phantom
+   rehearsal wrap.** (GATE 2 / GATE 4)
+
+Build, deploy, IDL, initialize, site flip, on-chain royalty + marketplace
+verification, and monitoring are mine to execute and prove.

@@ -1,4 +1,12 @@
 #!/bin/bash
+# ============================================================================
+# ⚠️  DEPRECATED — informational only. Superseded 2026-05-15.
+# Asserts the WRONG EXPECTED_DEPLOYER (FRZJ…TwQ; real deployer is the
+# bulls-box keypair GMrJpP7Sa…). Pre-flight is now the manual checks in
+# docs/LAUNCH_RUNBOOK.md / docs/LAUNCH_CHECKLIST.md. Read-only, so it does
+# no harm, but its deployer expectation is stale — do not trust its verdict.
+echo "DEPRECATED: see docs/LAUNCH_RUNBOOK.md; deployer is GMrJpP7Sa… not FRZJ…TwQ." >&2
+# ============================================================================
 # Mainnet launch pre-flight check — RUNS NO STATE-CHANGING COMMANDS.
 #
 # Validates that everything launch.sh needs is in place. Run this on the

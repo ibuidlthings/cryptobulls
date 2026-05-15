@@ -1,4 +1,15 @@
 #!/bin/bash
+# ============================================================================
+# ⚠️  DEPRECATED — DO NOT RUN. Superseded 2026-05-15.
+# MCC is already wired into the main web client (web/lib/*.ts, idl.json) —
+# there is no longer a separate pre-MCC client to "swap". Running this would
+# overwrite the current correct client with stale .mcc alternates. Site
+# build/deploy is the manual flow in docs/LAUNCH_RUNBOOK.md Phase 3.
+if [ "${I_KNOW_THIS_IS_DEPRECATED:-0}" != "1" ]; then
+  echo "DEPRECATED: MCC already in main client; see docs/LAUNCH_RUNBOOK.md. Aborting." >&2
+  exit 1
+fi
+# ============================================================================
 # Apply the MCC-aware web client (idl, program.ts, chain.ts + page hooks),
 # rebuild Next.js, and sync to /opt/cryptobulls-web.
 #
