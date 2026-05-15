@@ -1,3 +1,9 @@
+> # ℹ️ Tweet copy below is USABLE; cadence/automation is stale
+> The draft tweets are fine to use. Ignore any section that ties posting
+> cadence to `launch_preflight.sh`/`launch.sh` (deprecated) — sequence
+> announcements per [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md) Phase 5
+> (announce only after GATE 4 / clean private mainnet rehearsal).
+
 # Launch communication
 
 Three pieces, fired in sequence. Each draft is under Twitter's 280-char limit.

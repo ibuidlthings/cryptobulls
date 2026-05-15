@@ -65,7 +65,7 @@ Tech walkthrough: [TECH_WALKTHROUGH.md](TECH_WALKTHROUGH.md).
 │   │       └── unwrap_bull.rs  Verify NFT ownership, drain vault, burn NFT
 │   └── Cargo.toml
 │
-├── tests/                 Anchor mocha test suite (7 tests, all passing)
+├── tests/                 Anchor mocha test suite (12 tests, all passing)
 │   └── bullpeg.ts              Includes the critical vault-follows-NFT proof
 │
 ├── cranker/               Off-chain renderer + indexer

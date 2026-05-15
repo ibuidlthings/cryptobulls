@@ -1,3 +1,14 @@
+> # ⚠️ PARTIALLY STALE — verify against authoritative docs first
+> As of 2026-05-15: the upgrade-authority/deployer keypair is
+> `GMrJpP7Sa…` (the bulls-box `/root/.config/solana/id.json`), **not**
+> `FRZJ…TwQ` (that is the royalty treasury). "Scenario 1 — mid-launch
+> failure" assumes the deprecated `launch.sh` step structure — the real
+> launch is the **manual** [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md)
+> sequence (its "Rollback" section is authoritative). The "email Phantom /
+> whitelist thread" scenario is obsolete (root cause was
+> program-not-on-mainnet, resolved by deploying). General incident
+> guidance (box restore, RPC fallback, keypair backup) is still useful.
+
 # Recovery + incident playbook
 
 What to do when something breaks. Each scenario is independent — start

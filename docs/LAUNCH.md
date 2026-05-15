@@ -1,4 +1,16 @@
-# Launch-day runbook
+> # ⚠️ SUPERSEDED — DO NOT FOLLOW THIS DOCUMENT
+> Replaced 2026-05-15 by **[`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md)** +
+> **[`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md)** (authoritative).
+> This file contains **dangerous, wrong** instructions:
+> - It tells you to fund/verify `FRZJ…TwQ` as the **deployer** — that wallet
+>   is the **royalty treasury**, NOT the deployer. The real deployer is
+>   `GMrJpP7SaUkfyizsB3b8GeKWgDiqac3g5EaMGnMtkXCj` (the bulls-box keypair).
+>   Funding FRZJ…TwQ for deploy would strand deploy SOL in the wrong wallet.
+> - It drives launch through `scripts/launch.sh`, which is now **deprecated
+>   and fails closed**. Launch is the **manual** runbook sequence.
+> Kept only for historical context. Do not act on anything below.
+
+# Launch-day runbook (SUPERSEDED)
 
 Mainnet deploy of $BULLS + CryptoBulls program. Step-by-step, in order, with expected output. Practice the dry run on devnet at least once before doing this for real.
 

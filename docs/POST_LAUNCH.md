@@ -1,4 +1,13 @@
-# Post-launch sequencing — first 72 hours
+> # ⚠️ SUPERSEDED — DO NOT FOLLOW
+> Replaced 2026-05-15 by [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md)
+> (Phases 4–6) + [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md). Wrong here:
+> deployer is `GMrJpP7Sa…` not `FRZJ…TwQ` (FRZJ…TwQ is the royalty
+> treasury); the `launch_preflight.sh`/`launch.sh` automation is deprecated
+> (manual sequence now); the "Phantom whitelist / email review@phantom.com"
+> model was disproved (root cause was program-not-on-mainnet). Marketplace
+> royalty is **5%**, not 0%. Historical context only.
+
+# Post-launch sequencing — first 72 hours (SUPERSEDED)
 
 Minute-by-minute plan for launch day and the days that follow.
 Update timestamps as you go.

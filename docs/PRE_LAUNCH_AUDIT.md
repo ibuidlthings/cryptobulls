@@ -1,4 +1,13 @@
-# Pre-launch readiness audit
+> # ⚠️ OBSOLETE SNAPSHOT (2026-05-09) — DO NOT TRUST THIS VERDICT
+> Predates the corrected root-cause analysis. Its "GREEN — ready to launch"
+> verdict, "7/7 anchor / 10/10 unit tests", and "deployer `FRZJ…TwQ`"
+> (FRZJ…TwQ is the royalty treasury, deployer is `GMrJpP7Sa…`) are all
+> superseded. Current truth: pre-launch, program devnet-only (NOT on
+> mainnet), 12/12 anchor tests, manual launch. Authoritative:
+> [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md) /
+> [`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md). Historical only.
+
+# Pre-launch readiness audit (OBSOLETE 2026-05-09 SNAPSHOT)
 
 **Run date:** 2026-05-09 · **Auditor:** automated sweep against bulls box (165.22.167.96)
 

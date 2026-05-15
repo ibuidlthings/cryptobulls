@@ -1,3 +1,9 @@
+> # ⚠️ OBSOLETE — `launch.sh` is DEPRECATED
+> As of 2026-05-15 `scripts/launch.sh` fails closed and is not used; launch
+> is the **manual** [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md) sequence. This
+> validation also encodes the wrong deployer (`FRZJ…TwQ` is the royalty
+> treasury; deployer is `GMrJpP7Sa…`). Historical only.
+
 # launch.sh validation summary
 
 `launch.sh` is the single command run on launch day. This document records what's been verified about it without burning real mainnet SOL.

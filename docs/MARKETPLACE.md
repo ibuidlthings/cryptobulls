@@ -1,3 +1,20 @@
+> # ⚠️ PARTIALLY STALE — read with the corrections below
+> As of 2026-05-15, two claims in this doc are **factually wrong** and would
+> cause a real launch mistake if copied into marketplace forms:
+> - **ROYALTY IS 5% (500 bps), NOT 0%.** Every wrapped bull's on-chain
+>   metadata has `seller_fee_basis_points = 500` and creator
+>   `FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ` (share 100). Anywhere
+>   below that says "0%" / "no royalty" / "`seller_fee_basis_points = 0`"
+>   is WRONG — enter **5%** and the treasury wallet in ME/Tensor forms.
+> - The "deployer wallet `FRZJ…TwQ`" references are wrong: `FRZJ…TwQ` is the
+>   **royalty/creator treasury**; the deployer is `GMrJpP7Sa…`. For
+>   Creator-Hub claims, the wallet that receives royalties / should claim
+>   the collection is the treasury `FRZJ…TwQ`.
+> - Ignore "launches automatically with `scripts/launch.sh`" — that script
+>   is deprecated; launch is the manual [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md)
+>   sequence. Authoritative marketplace steps: runbook Phase 4 / step 8.
+> The collection-recognition mechanics (MCC auto-indexing) below remain valid.
+
 # Magic Eden + Tensor — pre-launch and launch-day plan
 
 What we have done, what happens automatically, and what you have to do
