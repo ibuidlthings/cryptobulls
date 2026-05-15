@@ -154,20 +154,30 @@ Mitigations already shipped (web/lib/cache.ts + the two routes):
   new nft_mint = new art/traits); immutable-by-tier served stale art for
   24h and broke the core mechanic.
 
-Still required for launch (infra/cost, the user's call):
+Status:
 
-- [ ] **Paid RPC plan** (Helius/Triton/QuickNode) for `SOLANA_RPC_URL`
-  (server) and `NEXT_PUBLIC_SOLANA_RPC_URL` (client). The code changes
-  cut required capacity ~10x but a real launch crawl + live wrap/unwrap
-  traffic still exceeds free tiers.
+- [x] **Dedicated Helius key acquired (2026-05-15).** Verified working on
+  BOTH devnet and mainnet (`getHealth` ok, `getAccountInfo` returns data).
+  Stored ONLY in the systemd `Environment=SOLANA_RPC_URL=` on the box —
+  never committed to the repo, never in the client bundle. Pre-launch it
+  is set to the Helius **devnet** endpoint
+  (`https://devnet.helius-rpc.com/?api-key=<CRYPTOBULLS_KEY>`).
+  **Launch-day action:** change `devnet` → `mainnet` in that one systemd
+  line (same key) and `systemctl daemon-reload && systemctl restart
+  cryptobulls-web`. That is the entirety of step 6's RPC change.
 - [ ] **Optional but strong: Cloudflare in front of cryptobulls.fun.**
   There is currently NO CDN (Caddy proxies straight to Node), so the
   `s-maxage` / `stale-while-revalidate` HTTP headers have nothing to
   honor. A CDN would absorb essentially all marketplace read load at the
-  edge and make the origin RPC cost negligible.
+  edge and make the origin RPC cost negligible. Not required (the
+  dedicated Helius key + single-flight + SWR handle launch load) but it
+  is the cheapest large headroom multiplier if volume is huge.
 
-Pre-launch the server RPC is the public `https://api.devnet.solana.com`
-(the dead Helius free key was removed from systemd 2026-05-15).
+Client-side `NEXT_PUBLIC_SOLANA_RPC_URL` deliberately stays on the public
+RPC: it is inlined into the public JS bundle, so the paid key must NOT go
+there. Client reads (/gallery, /bull/[tier]) are low-volume; the
+launch-critical marketplace crawl hits the server routes, which use the
+Helius `SOLANA_RPC_URL`.
 
 ## Rollback
 
