@@ -152,16 +152,35 @@ The chain reader is configured for devnet by default (env: `NEXT_PUBLIC_PROGRAM_
 
 ## Status
 
+**Pre-launch. The program is on devnet only — NOT on mainnet — and
+$BULLS has not launched on pump.fun.** The public site
+([cryptobulls.fun](https://cryptobulls.fun)) is intentionally gated to a
+pre-launch teaser (no wrap/unwrap, no live stats/feed/herd) until the
+launch sequence in [`docs/LAUNCH_RUNBOOK.md`](docs/LAUNCH_RUNBOOK.md) is
+executed.
+
+Done:
+
 - [x] Anchor program complete (initialize / wrap_bull / unwrap_bull / initialize_collection)
-- [x] Full anchor test suite passing (including the critical vault-follows-NFT proof)
-- [x] Devnet **and mainnet** deployed: `A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm`
-- [x] **Metaplex Certified Collection** (MCC) live — Magic Eden / Tensor / Phantom recognise the collection
-- [x] **Single-signer wrap_bull** (`nft_mint` is a PDA derived from `["nft_mint", bank.total_wrapped]`) so Phantom's Lighthouse can simulate cleanly without multi-signer warnings
-- [x] Live website at [cryptobulls.fun](https://cryptobulls.fun): wrap/unwrap UI, /gallery, /bull/[tier], /art (trait gallery + rarity math), /thesis, /tech, /security
-- [x] Explicit `build → simulate → sign → send` client flow implementing all 4 mitigations from [Phantom's docs](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings) — see [`web/lib/program.ts`](web/lib/program.ts) (`buildSignSimulateSend`)
-- [x] On-chain metadata + render API serving live bulls
+- [x] Full anchor test suite passing — 12 tests incl. the vault-follows-NFT proof and 3 adversarial vault-security tests
+- [x] **Devnet deployed**: `A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm` (executable on devnet; on mainnet this address is currently an empty system account — see runbook)
+- [x] Anchor IDL published **on devnet** (program decodes as `bullpeg`, not "Unknown program")
+- [x] **Metaplex Certified Collection** (MCC) wired (devnet) — verified on each wrap in tests
+- [x] **Single-signer wrap_bull** (`nft_mint` is a PDA from `["nft_mint", bank.total_wrapped]`)
+- [x] Explicit `build → simulate → sign → send` client flow using `signAndSendTransaction`, implementing all four mitigations from [Phantom's docs](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings) — [`web/lib/program.ts`](web/lib/program.ts)
+- [x] Client-side hard balance + SOL gates so a doomed tx is never sent
+- [x] Metadata/render API hardened for marketplace crawl load (single-flight + stale-while-revalidate cache; no immutable-by-tier bug; graceful 503 on RPC failure)
+- [x] Dedicated Helius RPC (server-side only) verified on devnet + mainnet
+- [x] Website pages built: `/`, `/thesis`, `/tech`, `/about`, `/art`, `/security`, `/gallery`, `/bull/[tier]`, `/wrap`, `/unwrap` (wrap/unwrap currently gated)
 - [x] 23 active accessory traits including **Pump** and **Phantom** (Rare tier additions)
+
+Pending (launch sequence — see [`docs/LAUNCH_RUNBOOK.md`](docs/LAUNCH_RUNBOOK.md)):
+
 - [ ] $BULLS launch on pump.fun
+- [ ] **Deploy program to mainnet** + publish IDL on mainnet
+- [ ] `initialize` + `initialize_collection` on mainnet with the real $BULLS mint
+- [ ] Flip site to `live` / mainnet, private mainnet rehearsal, then announce
+- [ ] Verified build + Blowfish submission (domain-reputation hardening)
 - [ ] Helius webhook + indexer for live activity feed
 - [ ] Auto-wrap via SPL delegate (v2)
 
