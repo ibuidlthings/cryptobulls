@@ -5,7 +5,7 @@ use anchor_spl::token::{
 };
 use anchor_spl::metadata::{
     self,
-    mpl_token_metadata::types::{Collection, DataV2},
+    mpl_token_metadata::types::{Collection, Creator, DataV2},
     CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
     VerifySizedCollectionItem,
 };
@@ -13,6 +13,22 @@ use anchor_spl::metadata::{
 use crate::state::{BullAsset, BullBank};
 use crate::errors::BullpegError;
 use crate::{MAX_BULLS, TOKENS_PER_BULL};
+
+/// Treasury wallet that is written as the on-chain creator of every
+/// CryptoBulls NFT and receives the secondary-sale royalty. This is the
+/// CryptoBulls deployer/admin/treasury wallet. It is intentionally a
+/// normal wallet (not a PDA) so Magic Eden / Tensor can route royalty
+/// payouts to it. The creator is `verified: false` by design: wrap_bull
+/// is permissionless (any holder can wrap), so the treasury cannot sign
+/// every mint to self-verify. Collection trust comes from the verified
+/// Metaplex Certified Collection (MCC), not from creator verification;
+/// ME/Tensor still honor `seller_fee_basis_points` and route the royalty
+/// to this address regardless of the verified flag.
+pub const ROYALTY_TREASURY: Pubkey =
+    pubkey!("FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ");
+
+/// Secondary-sale royalty in basis points (500 = 5%).
+pub const ROYALTY_BPS: u16 = 500;
 
 /// Wrap 1,000,000 $TOKEN into a bull NFT.
 ///
@@ -242,8 +258,12 @@ pub fn handler(ctx: Context<WrapBull>, tier_index: u16) -> Result<()> {
             name: format!("CryptoBulls #{}", tier_index),
             symbol: "BULLS".to_string(),
             uri: format!("https://cryptobulls.fun/api/metadata/{}", tier_index),
-            seller_fee_basis_points: 0,
-            creators: None,
+            seller_fee_basis_points: ROYALTY_BPS,
+            creators: Some(vec![Creator {
+                address: ROYALTY_TREASURY,
+                verified: false,
+                share: 100,
+            }]),
             collection: Some(Collection {
                 key: ctx.accounts.collection_mint.key(),
                 verified: false,

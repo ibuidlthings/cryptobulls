@@ -20,12 +20,51 @@ This was never a transaction-mechanics bug. The `signAndSendTransaction`,
 pre-simulation, blockhash, and balance-gate work is all correct and stays —
 but it was never the cause of the mainnet warning.
 
+## Wallet roles (DO NOT CONFUSE — different keys, different jobs)
+
+| Role | Address | Used for |
+|---|---|---|
+| **Deployer / upgrade authority** | `GMrJpP7SaUkfyizsB3b8GeKWgDiqac3g5EaMGnMtkXCj` (bulls-box keypair `/root/.config/solana/id.json`) | Signs `anchor deploy`, `anchor idl init`, `initialize`, `initialize_collection`. Must be funded with mainnet SOL at launch. |
+| **Royalty treasury / on-chain creator** | `FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ` | Hardcoded in `wrap_bull.rs` as `ROYALTY_TREASURY`; written into every NFT's on-chain metadata as the creator (share 100, `verified:false` by design). Magic Eden / Tensor route the 5% secondary royalty here. Does NOT sign anything; just receives. |
+
+These are intentionally two different wallets. The treasury is independent
+of the upgrade authority — it only needs to be a normal wallet the user
+controls so marketplaces can pay royalties to it.
+
+## Token-address handoff protocol
+
+$BULLS is not launched. The mint address does not exist yet.
+
+1. **Before launch:** user provides the pump.fun $BULLS mint address. It
+   goes into `NEXT_PUBLIC_TOKEN_MINT` (display) and is passed to
+   `initialize` (locks it into BullBank — immutable after).
+2. **At launch:** user explicitly notifies "it's live." Only then run the
+   launch sequence. Do not deploy/initialize against a guessed or
+   placeholder mint — `initialize` locks the mint permanently.
+
+## Royalty / creator (baked into the program — 2026-05-15)
+
+- `wrap_bull.rs`: `seller_fee_basis_points: 500` (5%), `creators:
+  Some([{address: ROYALTY_TREASURY, verified: false, share: 100}])`.
+- This is set in the Metaplex `CreateMetadataAccountsV3` CPI — it is NOT
+  part of the Anchor IDL or the wrap_bull instruction signature, so
+  `web/lib/idl.json` and the web client need NO changes for it.
+- It applies to every NFT minted by the **deployed** program. The mainnet
+  program MUST be built+deployed from this updated source (the change is
+  already compiled clean and test-verified on devnet — see below).
+- Creator is `verified:false` by design: wrap is permissionless so the
+  treasury can't sign every mint. Collection trust comes from the verified
+  MCC, not creator verification. ME/Tensor still honor the 5% and route to
+  the treasury. (Optional post-launch hardening: a consistent verified
+  program-PDA creator — not required for royalties to function.)
+
 ## Current state (pre-launch, safe)
 
 - `NEXT_PUBLIC_LAUNCH_STATE=pre-launch` in both the build (`web/.env.production`)
   and the systemd unit on the box. `/wrap` and `/unwrap` show "goes live at
   launch" cards. No public transaction can be attempted → no warnings, no
-  further domain-reputation poisoning.
+  further domain-reputation poisoning. (Local dev-only live config lives in
+  `web/.env.development.local`, which `next build` never reads.)
 - Devnet program exists and its **Anchor IDL is already published on devnet**
   (`anchor idl fetch ... --provider.cluster devnet` returns the bullpeg IDL).
   This proves the IDL-publish mechanism and confirms the upgrade authority
@@ -33,6 +72,17 @@ but it was never the cause of the mainnet warning.
   is correct.
 - Balance + SOL gates are deployed: a wrap/unwrap is never built if the
   wallet lacks the $BULLS / SOL the chain would require.
+- Server RPC = dedicated CryptoBulls Helius key (systemd `SOLANA_RPC_URL`
+  only; never committed, never in client bundle). Pre-launch: Helius
+  **devnet** endpoint. Launch: flip the one systemd line devnet→mainnet.
+- Metadata/render API hardened (single-flight + stale-while-revalidate,
+  no immutable-by-tier bug, graceful 503 on RPC failure) — survives a
+  full marketplace crawl of 1000 tiers.
+- Client tx flow audited launch-ready: legacy `Transaction` +
+  `connection.simulateTransaction(tx)` (NO config arg — the
+  "Invalid arguments" footgun is gone) + `wallet.sendTransaction`
+  (= Phantom `signAndSendTransaction`). Token mint read from on-chain
+  `fetchBank().tokenMint`, so it auto-picks the real $BULLS at launch.
 
 ## Pre-launch confirmation (do anytime, no risk)
 
@@ -43,8 +93,8 @@ the program/tx is fine and any cryptobulls.fun warning was domain-rep only.
 ```
 cd web
 npm install
-npm run dev          # uses web/.env.local → live mode, devnet
-```
+npm run dev          # uses web/.env.development.local → live mode, devnet
+```                  # (.env.local was deleted; next build never reads .development.local)
 
 1. Open http://localhost:3000/wrap
 2. Phantom → Devnet mode. Fund the test wallet with devnet SOL
@@ -61,55 +111,103 @@ npm run dev          # uses web/.env.local → live mode, devnet
 
 ## Launch day sequence (produces zero warnings)
 
-Do these IN ORDER. Steps 1–7 are private; do not announce until step 8
-confirms clean.
+Do these IN ORDER. Steps 0–9 are private; do not announce until step 10
+confirms clean. The bulls box `/root/bullpeg-sol` is NOT a git clone — it
+is a working copy; the program source there must be the royalty-bearing
+version (already synced + built + 12/12 tests pass on devnet as of
+2026-05-15).
 
-1. **Launch $BULLS on pump.fun.** Record the real mainnet token mint.
-2. **Fund the deployer/upgrade-authority wallet** (`GMrJpP7Sa...`) with
-   ~5 SOL on mainnet (program rent ≈ 3–4 SOL + IDL rent + fees).
+0. **Pre-flight (do the moment $BULLS launches, before anything else):**
+   - User confirms "$BULLS is live" and provides the **mainnet mint
+     address**.
+   - Sanity: `solana account <MINT> -u mainnet-beta` shows a real SPL
+     mint (decimals 6 for pump.fun), mint authority null.
+   - Confirm the program source on the box still has
+     `ROYALTY_TREASURY = FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ`
+     and `ROYALTY_BPS = 500` in `programs/bullpeg/src/instructions/wrap_bull.rs`.
+1. **Fund the deployer/upgrade-authority wallet** `GMrJpP7Sa...`
+   (`/root/.config/solana/id.json`) with **~5 SOL on mainnet** (program
+   rent ≈ 3–4 SOL + IDL rent ≈ 0.1 + init + fees). This is the DEPLOYER
+   key, not the royalty treasury — see the wallet-roles table above.
+2. **Build fresh from the royalty-bearing source:**
+   ```
+   cd /root/bullpeg-sol && anchor build
+   ```
+   Confirm `target/deploy/bullpeg.so` + `target/idl/bullpeg.json` are
+   freshly timestamped and the build log has 0 errors.
 3. **Deploy the program to mainnet:**
    ```
-   cd /root/bullpeg-sol
    anchor deploy --provider.cluster mainnet-beta
    ```
-   Confirm: `solana program show <PROGRAM_ID> -u mainnet-beta` shows
-   `Executable: true`, owner = BPF upgradeable loader.
+   Confirm: `solana program show <PROGRAM_ID> -u mainnet-beta` →
+   `Executable: true`, owner = BPF upgradeable loader, Authority =
+   `GMrJpP7Sa...`.
 4. **Publish the IDL on mainnet** (kills the "Unknown program" label):
    ```
-   anchor idl init <PROGRAM_ID> \
-     --filepath target/idl/bullpeg.json \
+   anchor idl init <PROGRAM_ID> --filepath target/idl/bullpeg.json \
      --provider.cluster mainnet-beta
    ```
    Confirm: `anchor idl fetch <PROGRAM_ID> --provider.cluster mainnet-beta`
    returns the bullpeg IDL.
-5. **Initialize on mainnet:**
+5. **Initialize on mainnet** with the REAL $BULLS mint:
    ```
-   # initialize: locks the real $BULLS mint into BullBank
-   # initialize_collection: sets up the MCC collection NFT
+   # initialize           → locks the real $BULLS mint into BullBank (immutable)
+   # initialize_collection → creates the MCC collection NFT
    ```
-   (use the devnet init scripts adapted to mainnet + the real mint).
-6. **Repoint the site env** (both `web/.env.production` AND the systemd
-   unit on the box):
+   Use the devnet init scripts pointed at mainnet + the real mint.
+   `initialize` is one-time and locks the mint forever — triple-check the
+   mint address before running.
+6. **Repoint the site env** (BOTH `web/.env.production` AND the systemd
+   unit; remember `.env.local` must NOT exist on the build machine — only
+   `.env.development.local`, which `next build` ignores):
    ```
    NEXT_PUBLIC_LAUNCH_STATE=live
    NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta
-   NEXT_PUBLIC_PROGRAM_ID=<mainnet program id>
+   NEXT_PUBLIC_PROGRAM_ID=<mainnet program id>   # same id if same keypair
    NEXT_PUBLIC_TOKEN_MINT=<real $BULLS mint>
-   NEXT_PUBLIC_SOLANA_RPC_URL=<mainnet RPC>
-   SOLANA_RPC_URL=<mainnet Helius RPC>     # systemd only, not committed
+   NEXT_PUBLIC_SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+   SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=<CRYPTOBULLS_KEY>  # systemd only
    ```
-   Rebuild (`npm run build`), redeploy standalone+static, restart service.
-7. **Rehearsal 2 — private mainnet wrap (the real confirmation gate):**
+   Rebuild (`npm run build`), redeploy standalone+static, `daemon-reload`,
+   restart service. Verify homepage badge no longer says "Launching soon"
+   and `/wrap` shows the live UI.
+7. **Royalty/creator on-chain verification (private):** do ONE private
+   wrap, then check the minted NFT's on-chain metadata:
+   ```
+   # fetch the Metaplex metadata account for the new nft_mint and confirm:
+   #   sellerFeeBasisPoints == 500
+   #   creators == [{ address: FRZJ...TwQ, share: 100 }]
+   #   collection.verified == true (MCC)
+   ```
+   If any is wrong, STOP — do not announce; the program must be rebuilt
+   /redeployed. (This is why step 7 precedes the public announce.)
+   The anchor suite already proves this deterministically on every run:
+   `tests/bullpeg.ts` `assertRoyalty()` decodes the freshly-minted NFT's
+   Metaplex metadata and fails if `sellerFeeBasisPoints != 500` or the
+   single creator is not `FRZJ...TwQ` @ share 100. Step 7 is the mainnet
+   re-confirmation of an already-test-gated invariant.
+8. **Marketplace visibility check:** the wrapped NFT is a standard
+   Metaplex NFT in a verified MCC, so Magic Eden and Tensor auto-index it
+   — but confirm before announcing:
+   - Open the NFT mint on Magic Eden and Tensor; image + traits +
+     "CryptoBulls" collection grouping must resolve (they read
+     `/api/metadata/<tier>` and the verified collection on-chain).
+   - If image/traits don't show: check `/api/metadata/<tier>` and
+     `/api/render/<tier>` return 200 on mainnet (the Helius key + cache
+     layer must be live), and that `external_url`/`image` resolve.
+   - Optional accelerators: submit the collection to Magic Eden / Tensor
+     listing forms; claim the Creator Hub for the banner.
+9. **Rehearsal 2 — private mainnet wrap (the real confirmation gate):**
    With your own wallet holding ≥1,000,000 $BULLS + ≥0.03 SOL, do ONE
    wrap on cryptobulls.fun on Phantom-mainnet, **before any public
    announcement**.
-   - Clean (no warning, Advanced shows `bullpeg: wrapBull`, tx confirms)
-     → proceed to step 8.
+   - Clean (no warning, Advanced shows `bullpeg: wrapBull`, tx confirms,
+     NFT appears in Phantom Collectibles) → proceed to step 10.
    - Warning → you found out privately. Do not announce. Capture the
-     `[bullpeg-tx:wrapBull]` log + screenshot; the remaining factor is
-     domain reputation — pursue verified build + Blowfish submission
-     (below) and re-test before announcing.
-8. **Announce.** Only after step 7 is clean.
+     `[bullpeg-tx:wrapBull]` console object + Phantom screenshot; the
+     remaining factor is domain reputation — pursue verified build +
+     Blowfish submission (below) and re-test before announcing.
+10. **Announce.** Only after steps 7–9 are all clean.
 
 ## Domain-reputation hardening (do before/around launch)
 

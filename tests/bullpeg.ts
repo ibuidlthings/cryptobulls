@@ -125,6 +125,33 @@ async function assertVerifiedCollection(
   expect(collection.verified).to.equal(true);
 }
 
+// Helper: prove the on-chain metadata carries the secondary-royalty config
+// expected by Magic Eden / Tensor — sellerFeeBasisPoints === 500 (5%) and a
+// single creator == the royalty treasury with 100% share. This is the proof
+// that the royalty/creator change in wrap_bull.rs actually lands on-chain.
+const ROYALTY_TREASURY = "FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ";
+const ROYALTY_BPS = 500;
+async function assertRoyalty(
+  connection: anchor.web3.Connection,
+  metadataPda: PublicKey,
+) {
+  const acc = await connection.getAccountInfo(metadataPda);
+  if (!acc) throw new Error(`metadata account ${metadataPda} not found`);
+  const meta = decodeMetadata(acc.data);
+  expect(Number(meta.sellerFeeBasisPoints)).to.equal(ROYALTY_BPS);
+  const creators = meta.creators?.__option === "Some"
+    ? meta.creators.value
+    : meta.creators;
+  if (!creators || creators.length !== 1) {
+    throw new Error(`expected exactly 1 creator, got ${JSON.stringify(creators)}`);
+  }
+  const addr = typeof creators[0].address === "string"
+    ? creators[0].address
+    : creators[0].address.toString();
+  expect(addr).to.equal(ROYALTY_TREASURY);
+  expect(Number(creators[0].share)).to.equal(100);
+}
+
 // Helper: derive all PDAs needed for a wrap/unwrap call
 interface WrapBullPdas {
   bullAsset: PublicKey;
@@ -456,6 +483,10 @@ describe("bullpeg", () => {
       connection, pdas.metadata, collectionMint.publicKey,
     );
 
+    // CRITICAL: bull's metadata carries the 5% secondary royalty + treasury
+    // creator so Magic Eden / Tensor enforce + route royalties on resale.
+    await assertRoyalty(connection, pdas.metadata);
+
     // Collection size counter incremented to 1
     const collMetaAcc = await connection.getAccountInfo(collPdas.collectionMetadata);
     const collMeta = decodeMetadata(collMetaAcc!.data);
@@ -572,6 +603,10 @@ describe("bullpeg", () => {
     await assertVerifiedCollection(
       connection, pdas.metadata, collectionMint.publicKey,
     );
+
+    // CRITICAL: bull's metadata carries the 5% secondary royalty + treasury
+    // creator so Magic Eden / Tensor enforce + route royalties on resale.
+    await assertRoyalty(connection, pdas.metadata);
 
     // BullAsset has the NEW nft_mint (visual re-rolled — different
     // total_wrapped → different PDA → different visual)

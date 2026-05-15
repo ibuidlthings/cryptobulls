@@ -34,6 +34,10 @@ samples/
 !samples/showcase/index.html
 !samples/mascots/index.html
 
+# Scratch trait-preview HTML (regenerable from cranker scripts)
+cranker/*_preview.html
+cranker/all_traits.html
+
 # OS / editor
 .DS_Store
 Thumbs.db
