@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchBullAsset, getConnection } from "@/lib/chain";
 import { renderBullSvg, deriveSeed } from "@/lib/renderer.mjs";
 import { svgToPixels, encodePng } from "@/lib/svg_to_png.mjs";
-import { cacheWrap } from "@/lib/cache";
+import { cacheWrapSWR } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,11 @@ interface RouteContext {
 }
 
 const PNG_PIXEL_SCALE = 32; // 24 * 32 = 768x768
-const TTL_MS = 60_000;
+// 10 min: a wrapped bull's visual is locked at wrap time and only
+// changes if the tier is unwrapped + re-wrapped (rare). Long TTL +
+// SWR + single-flight is what keeps a single RPC key alive under a
+// full marketplace crawl of all 1000 tiers.
+const TTL_MS = 600_000;
 
 interface RenderedAsset {
   svg: string;
@@ -44,16 +48,51 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return new NextResponse("invalid tier", { status: 400 });
   }
 
-  const asset = await cacheWrap(
-    "render",
-    String(tier),
-    TTL_MS,
-    () => loadRendered(tier),
-  );
+  // CACHE POLICY (fixed 2026-05-15): the visual is deterministic from
+  // nft_mint, but tier NUMBERS are reused — unwrap #42 then re-wrap #42
+  // mints a fresh nft_mint and a DIFFERENT bull. Caching `immutable` by
+  // tier served stale art for up to 24h on every re-rolled bull and broke
+  // the core tier-reuse mechanic. Instead: short browser cache + a longer
+  // shared (CDN/marketplace) window with stale-while-revalidate. Burst
+  // crawler load is absorbed (by the in-process 60s cacheWrap below + the
+  // shared cache), but a re-rolled bull self-corrects within minutes, not
+  // a day, and NEVER serves a permanently-frozen wrong image.
+  const POSITIVE_CACHE =
+    "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+  // Unwrapped tiers can become wrapped at any moment — keep the negative
+  // cache short so a freshly-wrapped bull shows up fast, but non-zero so
+  // marketplaces probing all 1000 tiers don't cause 1000 uncached RPC
+  // reads per crawl.
+  const NEGATIVE_CACHE = "public, max-age=20, s-maxage=20";
+
+  let asset: RenderedAsset | null;
+  try {
+    // Long positive TTL (wrapped bull only changes on unwrap), short
+    // negative TTL (a freshly-wrapped tier should surface fast). SWR +
+    // single-flight collapse marketplace-crawl bursts into ~1 RPC/tier.
+    asset = await cacheWrapSWR(
+      "render",
+      String(tier),
+      { ttlMs: TTL_MS, negativeTtlMs: 60_000 },
+      () => loadRendered(tier),
+    );
+  } catch (e) {
+    // RPC blip / rate-limit under marketplace load. Don't 500-storm and
+    // don't let a CDN cache an error: controlled 503, no-store, retry.
+    return new NextResponse("temporarily unavailable, retry", {
+      status: 503,
+      headers: {
+        "Cache-Control": "no-store",
+        "Retry-After": "5",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
   if (!asset) {
     return new NextResponse(
       `CryptoBulls #${tier} is not currently wrapped`,
-      { status: 404 }
+      { status: 404, headers: { "Cache-Control": NEGATIVE_CACHE } }
     );
   }
 
@@ -64,10 +103,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": "image/svg+xml; charset=utf-8",
-        // Visual is deterministic from nft_mint and locked at wrap time.
-        // Cache aggressively (1 day) so marketplace crawlers don't trigger
-        // a re-render every batch.
-        "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+        "Cache-Control": POSITIVE_CACHE,
         "Access-Control-Allow-Origin": "*",
         "X-Cache-Source": "in-process",
       },
@@ -79,7 +115,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     status: 200,
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+      "Cache-Control": POSITIVE_CACHE,
       "Access-Control-Allow-Origin": "*",
       "X-Cache-Source": "in-process",
     },

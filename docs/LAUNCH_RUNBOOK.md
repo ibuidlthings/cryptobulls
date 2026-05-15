@@ -130,6 +130,45 @@ residual third-party (Blowfish) variable. Reduce it:
   through clean, decodable, verified on-chain activity, which steps 3–7
   produce.
 
+## RPC scaling (launch-critical — discovered 2026-05-15)
+
+At launch, Magic Eden / Tensor / Phantom crawl `/api/metadata/[tier]` and
+`/api/render/[tier]` for all 1000 tiers, repeatedly. A single free RPC key
+**will** hit "max usage reached" (`-32429`) under that load and the entire
+collection renders broken everywhere. This already happened on the devnet
+Helius free key.
+
+Mitigations already shipped (web/lib/cache.ts + the two routes):
+
+- **Single-flight**: N concurrent misses for a tier collapse to ONE RPC
+  call. Kills the per-60s thundering herd.
+- **Long positive TTL (10 min) + stale-while-revalidate**: a wrapped
+  bull only changes on unwrap; serve cached/stale instantly and refresh
+  in the background. ~1 RPC per tier per 10 min instead of per request.
+- **Short negative TTL (60s in-proc / 20s HTTP)**: 1000-tier probes of
+  mostly-unwrapped tiers don't storm RPC, but a freshly-wrapped bull
+  still surfaces within ~1 min.
+- **Controlled 503 + `no-store` on RPC failure**: a blip degrades
+  gracefully and is never cached as an error, instead of a 500 storm.
+- **No more `immutable` by tier**: tiers are reused (unwrap → re-wrap =
+  new nft_mint = new art/traits); immutable-by-tier served stale art for
+  24h and broke the core mechanic.
+
+Still required for launch (infra/cost, the user's call):
+
+- [ ] **Paid RPC plan** (Helius/Triton/QuickNode) for `SOLANA_RPC_URL`
+  (server) and `NEXT_PUBLIC_SOLANA_RPC_URL` (client). The code changes
+  cut required capacity ~10x but a real launch crawl + live wrap/unwrap
+  traffic still exceeds free tiers.
+- [ ] **Optional but strong: Cloudflare in front of cryptobulls.fun.**
+  There is currently NO CDN (Caddy proxies straight to Node), so the
+  `s-maxage` / `stale-while-revalidate` HTTP headers have nothing to
+  honor. A CDN would absorb essentially all marketplace read load at the
+  edge and make the origin RPC cost negligible.
+
+Pre-launch the server RPC is the public `https://api.devnet.solana.com`
+(the dead Helius free key was removed from systemd 2026-05-15).
+
 ## Rollback
 
 - Re-gate instantly: set `NEXT_PUBLIC_LAUNCH_STATE=pre-launch` in

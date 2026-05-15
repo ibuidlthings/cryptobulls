@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchBullAsset, getConnection } from "@/lib/chain";
 import { selectTraits, deriveSeed } from "@/lib/renderer.mjs";
-import { cacheWrap } from "@/lib/cache";
+import { cacheWrapSWR } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,17 +51,45 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return NextResponse.json({ error: "invalid tier" }, { status: 400 });
   }
 
-  // Cached chain read: same tier within 60s skips the RPC.
-  const bull = await cacheWrap(
-    "bull-asset",
-    String(tier),
-    60_000,
-    async () => await fetchBullAsset(getConnection(), tier),
-  );
+  // Cache policy: see /api/render/[tier] for the full rationale. Tiers are
+  // reused (unwrap → re-wrap = new nft_mint = new traits), so metadata must
+  // NOT be `immutable` by tier. Short browser cache + longer shared window
+  // with stale-while-revalidate; a re-rolled bull's traits self-correct
+  // within minutes instead of being frozen wrong for 24h.
+  const POSITIVE_CACHE =
+    "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+  const NEGATIVE_CACHE = "public, max-age=20, s-maxage=20";
+
+  // Long positive TTL (traits are locked to nft_mint; only change on
+  // unwrap+rewrap), short negative TTL. SWR + single-flight collapse a
+  // 1000-tier marketplace crawl into ~1 RPC per tier per 10 min.
+  let bull;
+  try {
+    bull = await cacheWrapSWR(
+      "bull-asset",
+      String(tier),
+      { ttlMs: 600_000, negativeTtlMs: 60_000 },
+      async () => await fetchBullAsset(getConnection(), tier),
+    );
+  } catch (e) {
+    // RPC blip under marketplace crawl load — controlled 503, not a 500
+    // storm, and never let a CDN cache the error.
+    return NextResponse.json(
+      { error: "temporarily unavailable, retry" },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store",
+          "Retry-After": "5",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
   if (!bull) {
     return NextResponse.json(
       { error: `CryptoBulls #${tier} is not currently wrapped` },
-      { status: 404 }
+      { status: 404, headers: { "Cache-Control": NEGATIVE_CACHE } }
     );
   }
 
@@ -101,11 +129,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
   return NextResponse.json(metadata, {
     headers: {
-      // Metadata for a wrapped bull is immutable: traits are seeded from
-      // nft_mint and the visual is locked at wrap time. Cache aggressively
-      // so Magic Eden / Tensor crawlers don't hammer our RPC. After unwrap
-      // the URL 404s - marketplaces re-crawl on burn anyway.
-      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+      "Cache-Control": POSITIVE_CACHE,
       "Access-Control-Allow-Origin": "*",
     },
   });
