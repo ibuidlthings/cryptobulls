@@ -63,7 +63,7 @@ export default function WrapPage() {
   const [lastResult, setLastResult] = useState<{ tier: number; nftMint: string; sig: string } | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) return;
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions || !wallet.sendTransaction) return;
     setLoading(true);
     try {
       const program = getProgram(connection, wallet as any);
@@ -95,13 +95,56 @@ export default function WrapPage() {
   const balanceWhole = Number(bullsBalance) / 1_000_000;
 
   async function handleWrap() {
-    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) return;
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions || !wallet.sendTransaction) return;
     if (!tokenMint) return;
-    setBusy(true); setStatus("Building transaction...");
+    setBusy(true); setStatus("Checking balance...");
     setSimLogs(null);
     try {
       const program = getProgram(connection, wallet as any);
       const tier = nextTier;
+
+      // HARD BALANCE GATE (Phantom support recommendation, 2026-05-15):
+      // never construct or send a wrap tx the chain will reject for
+      // InsufficientBalance. Phantom simulates every tx in-wallet; a
+      // guaranteed-revert tx is what triggers the "this dApp could be
+      // malicious" / "transaction reverted" warnings. Re-read the LIVE
+      // balance here (not the possibly-stale React state) and bail in-UI
+      // before the wallet is ever invoked.
+      const liveBalance = await fetchUserTokenBalance(
+        connection,
+        wallet.publicKey,
+        new (await import("@solana/web3.js")).PublicKey(tokenMint),
+      );
+      if (liveBalance < TOKENS_PER_BULL_BASE) {
+        const haveWhole = Number(liveBalance) / 1_000_000;
+        setBusy(false);
+        setStatus(
+          `✗ You need ${TOKENS_PER_BULL_WHOLE.toLocaleString()} $BULLS to wrap. ` +
+          `This wallet holds ${haveWhole.toLocaleString(undefined, { maximumFractionDigits: 2 })}. ` +
+          `No transaction was sent.`,
+        );
+        return;
+      }
+
+      // HARD SOL GATE (Phantom Advanced view 2026-05-15 showed "you don't
+      // have enough SOL for this transaction"). wrap_bull creates nft_mint
+      // + vault ATA + payer NFT ATA + Metaplex metadata + master edition +
+      // bull_asset — roughly 0.022 SOL of rent, plus fees + priority fee.
+      // Require a 0.03 SOL floor so the tx can't revert for lamports and
+      // get flagged by Phantom's simulation. Never send a doomed tx.
+      const SOL_FLOOR_LAMPORTS = 30_000_000; // 0.03 SOL
+      const solLamports = await connection.getBalance(wallet.publicKey);
+      if (solLamports < SOL_FLOOR_LAMPORTS) {
+        setBusy(false);
+        setStatus(
+          `✗ You need at least 0.03 SOL to cover account rent + network ` +
+          `fees for the wrap. This wallet holds ` +
+          `${(solLamports / 1_000_000_000).toFixed(4)} SOL. ` +
+          `Add SOL and try again. No transaction was sent.`,
+        );
+        return;
+      }
+
       // Capture pre-wrap totalWrapped so we can confirm the chain advanced
       // before the next refresh runs. Without this, RPC commitment race can
       // make refresh() see stale state and the UI re-offers the same tier

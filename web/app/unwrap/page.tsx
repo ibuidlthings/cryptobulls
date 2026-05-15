@@ -64,7 +64,7 @@ export default function UnwrapPage() {
   const [simLogs, setSimLogs] = useState<string[] | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) return;
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions || !wallet.sendTransaction) return;
     setLoading(true);
     try {
       const program = getProgram(connection, wallet as any);
@@ -84,12 +84,54 @@ export default function UnwrapPage() {
 
   async function handleUnwrap(tier: number, nftMint: PublicKey) {
     if (!wallet.publicKey || !tokenMint) return;
-    if (!wallet.signTransaction || !wallet.signAllTransactions) return;
+    if (!wallet.signTransaction || !wallet.signAllTransactions || !wallet.sendTransaction) return;
     setBusyTier(tier);
-    setStatus(`Unwrapping CryptoBulls #${tier}... please approve in your wallet`);
+    setStatus(`Verifying ownership of CryptoBulls #${tier}...`);
     setSimLogs(null);
     try {
       const program = getProgram(connection, wallet as any);
+
+      // HARD OWNERSHIP GATE (Phantom support recommendation, 2026-05-15):
+      // never construct or send an unwrap tx the chain will reject for
+      // NotNftHolder. Re-verify the connected wallet still holds this
+      // bull's NFT before the wallet is ever invoked. A guaranteed-revert
+      // tx is what triggers Phantom's malicious / reverted warnings.
+      const ownedNow = await fetchUserOwnedBulls(
+        connection,
+        wallet.publicKey,
+        program,
+      );
+      const stillOwned = ownedNow.some(
+        (b) => b.tier === tier && b.nftMint.equals(nftMint),
+      );
+      if (!stillOwned) {
+        setBusyTier(null);
+        setStatus(
+          `✗ This wallet no longer holds CryptoBulls #${tier}. ` +
+          `No transaction was sent.`,
+        );
+        await refresh();
+        return;
+      }
+
+      // SOL fee gate. unwrap_bull net-refunds rent (it closes the vault +
+      // bull_asset back to the caller) but the wallet still needs lamports
+      // up front for the tx fee + priority fee. Require a small 0.005 SOL
+      // floor so a fee-starved revert never reaches Phantom's simulation.
+      const SOL_FEE_FLOOR = 5_000_000; // 0.005 SOL
+      const solLamports = await connection.getBalance(wallet.publicKey);
+      if (solLamports < SOL_FEE_FLOOR) {
+        setBusyTier(null);
+        setStatus(
+          `✗ You need at least 0.005 SOL to cover network fees for the ` +
+          `unwrap. This wallet holds ` +
+          `${(solLamports / 1_000_000_000).toFixed(4)} SOL. ` +
+          `Add SOL and try again. No transaction was sent.`,
+        );
+        return;
+      }
+
+      setStatus(`Unwrapping CryptoBulls #${tier}... please approve in your wallet`);
       const preBank: any = await fetchBank(program, "processed");
       const preUnwrap = BigInt(preBank.totalUnwrapped.toString());
       const result = await unwrapBull(

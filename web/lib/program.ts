@@ -96,6 +96,15 @@ export interface WalletLike {
   publicKey: PublicKey;
   signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
   signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>;
+  // wallet-adapter's sendTransaction calls Phantom's
+  // `provider.signAndSendTransaction(tx)` under the hood. Phantom support
+  // (2026-05-13) asked us to use this so Phantom can apply Lighthouse
+  // protections with full visibility into both signing and submission.
+  sendTransaction<T extends Transaction | VersionedTransaction>(
+    transaction: T,
+    connection: Connection,
+    options?: any,
+  ): Promise<string>;
 }
 
 export function getProgram(connection: Connection, wallet: WalletLike): Program<Idl> {
@@ -221,69 +230,68 @@ export class SimulationError extends Error {
 //   2. Phantom signs first via signTransaction (not signAndSendTransaction).
 //   3. Tx size logged when NEXT_PUBLIC_DEBUG_TX=1, so size regressions show up.
 //   4. Server-side simulate with sigVerify:false before signing.
+// Direct, line-for-line translation of Phantom support's reference snippet
+// (2026-05-13) into our Anchor + wallet-adapter setup. Key points:
+//   - LEGACY Transaction (Anchor's .transaction() returns one). No v0.
+//   - `connection.simulateTransaction(tx)` with NO config arg. In
+//     @solana/web3.js the legacy no-config path internally applies
+//     sigVerify:false + replaceRecentBlockhash:true — which is exactly
+//     what Phantom's snippet shows explicitly. Passing the config object
+//     ourselves is what previously threw "Invalid arguments" (the legacy
+//     overload's 2nd positional is `signers`, not a config). This avoids it.
+//   - `wallet.sendTransaction(tx, connection)` === Phantom's
+//     `provider.signAndSendTransaction(tx)` so Phantom signs AND submits
+//     with full Lighthouse visibility.
 async function buildSignSimulateSend(
   connection: Connection,
   wallet: WalletLike,
   builder: any,
   label: string,
 ): Promise<string> {
-  // 1. Build instructions via Anchor, then wrap into a VersionedTransaction.
-  //    The modern web3.js simulateTransaction overload — the only one that
-  //    accepts { sigVerify: false } — requires VersionedTransaction. We
-  //    tried casting the legacy overload to `any` and it threw "Invalid
-  //    arguments" at runtime because the second positional is `signers`,
-  //    not a config object.
-  const legacyTx: Transaction = await builder.transaction();
-  const instructions = legacyTx.instructions;
+  // 1. Build a legacy Transaction (Phantom's reference uses `new Transaction()`;
+  //    Anchor's .transaction() returns a legacy Transaction directly).
+  const tx: Transaction = await builder.transaction();
 
-  // 2. "finalized" blockhash avoids the race where Phantom resimulates
-  //    against a not-yet-surfaced slot and surfaces a generic warning.
+  // 2. "confirmed" blockhash, exactly as Phantom's snippet.
   const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash("finalized");
+    await connection.getLatestBlockhash("confirmed");
 
-  // 3. Compile v0 message. Single signer (payer) — IDL confirms only
-  //    payer is signer:true for wrap_bull/unwrap_bull.
-  const message = new TransactionMessage({
-    payerKey: wallet.publicKey,
-    recentBlockhash: blockhash,
-    instructions,
-  }).compileToV0Message();
-  const tx = new VersionedTransaction(message);
+  // 3. feePayer + recentBlockhash set directly on the legacy tx
+  //    (matches `tx.feePayer = ...; tx.recentBlockhash = ...`).
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = blockhash;
 
-  // 4. Server-side simulate FIRST (Phantom mitigation #4). sigVerify:false
-  //    because tx isn't signed yet. This is the step Anchor's .rpc() skips.
-  const sim = await connection.simulateTransaction(tx, {
-    sigVerify: false,
-    replaceRecentBlockhash: false,
-    commitment: "processed",
-  });
+  // 4. Pre-simulate. NO config object: the legacy Transaction path in
+  //    @solana/web3.js auto-applies sigVerify:false + replaceRecentBlockhash:true
+  //    internally, which is precisely Phantom's `{ sigVerify: false,
+  //    replaceRecentBlockhash: true }`. Passing the object explicitly is
+  //    what produced "Invalid arguments" before.
+  const sim = await connection.simulateTransaction(tx);
 
-  // 5. Always-on diagnostic. Copy/paste this object from the browser
-  //    console into Phantom support tickets — it contains everything they
-  //    need to reproduce.
+  // 5. Always-on diagnostic for Phantom support tickets.
   if (typeof window !== "undefined") {
+    const msg = tx.compileMessage();
     // eslint-disable-next-line no-console
     console.log(`[bullpeg-tx:${label}]`, {
-      size: tx.serialize().length,
-      numRequiredSignatures: message.header.numRequiredSignatures,
-      numReadonlySignedAccounts: message.header.numReadonlySignedAccounts,
-      numReadonlyUnsignedAccounts: message.header.numReadonlyUnsignedAccounts,
-      staticAccountKeys: message.staticAccountKeys.length,
+      size: tx.serializeMessage().length,
+      numRequiredSignatures: msg.header.numRequiredSignatures,
+      numReadonlySignedAccounts: msg.header.numReadonlySignedAccounts,
+      numReadonlyUnsignedAccounts: msg.header.numReadonlyUnsignedAccounts,
+      accountKeys: msg.accountKeys.length,
       simulationErr: sim.value.err,
       simulationLogs: sim.value.logs,
-      txVersion: message.version,
+      txKind: "legacy",
       blockhash,
     });
   }
 
   if (sim.value.err) {
     const logs: string[] = sim.value.logs ?? [];
-    // Anchor emits errors as "AnchorError ... Error Code: X. Error
-    // Number: Y. Error Message: Z". Pull the human-readable line.
+    // Anchor emits errors as "AnchorError ... Error Message: Z".
     const errLine =
       logs.find((l: string) => l.includes("Error Message:")) ??
       logs[logs.length - 1] ??
-      "unknown";
+      JSON.stringify(sim.value.err);
     throw new SimulationError(
       `simulation failed: ${errLine}`,
       logs,
@@ -291,21 +299,10 @@ async function buildSignSimulateSend(
     );
   }
 
-  // 6. Phantom signs FIRST (Phantom mitigation #2). Single signer, so no
-  //    partialSign step is required afterwards. signTransaction (NOT
-  //    signAndSendTransaction) per Phantom's docs.
-  const signedTx = await wallet.signTransaction(tx);
+  // 6. signAndSendTransaction via wallet adapter (= provider.signAndSendTransaction).
+  const sig = await wallet.sendTransaction(tx, connection);
 
-  // 7. Send raw. skipPreflight:false lets the RPC catch obvious failures
-  //    locally; we already simulated above so this should be cheap.
-  const sig = await connection.sendRawTransaction(signedTx.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: "processed",
-    maxRetries: 3,
-  });
-
-  // 8. Confirm using the same blockhash we built with, so we honor its
-  //    lifetime rather than waiting on a fresh getBlockHeight loop.
+  // 7. Confirm with the same blockhash we built with.
   await connection.confirmTransaction(
     { signature: sig, blockhash, lastValidBlockHeight },
     "confirmed",
