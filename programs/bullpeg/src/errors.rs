@@ -40,4 +40,7 @@ pub enum BullpegError {
 
     #[msg("Caller is not the program authority recorded in BullBank")]
     NotProgramAuthority,
+
+    #[msg("Only the program's upgrade authority may call initialize")]
+    UnauthorizedInitializer,
 }

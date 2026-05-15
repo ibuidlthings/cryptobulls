@@ -23,16 +23,30 @@ async function main() {
     program.programId
   );
 
+  // initialize is gated on the program's on-chain upgrade authority.
+  // The provider wallet here MUST be the deployer/upgrade authority.
+  const BPF_LOADER_UPGRADEABLE = new PublicKey(
+    "BPFLoaderUpgradeab1e11111111111111111111111"
+  );
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE
+  );
+
   console.log("program id:", program.programId.toBase58());
   console.log("token mint:", tokenMint.toBase58());
   console.log("bank pda:  ", bankPda.toBase58(), "(bump", bankBump + ")");
-  console.log("authority: ", provider.wallet.publicKey.toBase58());
+  console.log("program data:", programDataPda.toBase58());
+  console.log("authority: ", provider.wallet.publicKey.toBase58(),
+    "(must be the program upgrade authority)");
 
   const sig = await program.methods
     .initialize(tokenMint)
     .accounts({
       bank: bankPda,
       authority: provider.wallet.publicKey,
+      program: program.programId,
+      programData: programDataPda,
       systemProgram: anchor.web3.SystemProgram.programId,
     } as any)
     .rpc();

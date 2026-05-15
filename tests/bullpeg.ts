@@ -234,6 +234,19 @@ describe("bullpeg", () => {
   const program = anchor.workspace.Bullpeg as Program<Bullpeg>;
   const connection = provider.connection;
 
+  // The provider wallet is the program's upgrade authority under
+  // `anchor test` (anchor deploys with this wallet). `initialize` and
+  // `initialize_collection` are now gated on the on-chain upgrade
+  // authority, so the admin signer for those is the provider wallet.
+  const adminPk = provider.wallet.publicKey;
+  const BPF_LOADER_UPGRADEABLE = new PublicKey(
+    "BPFLoaderUpgradeab1e11111111111111111111111",
+  );
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE,
+  );
+
   // === Constants ===
   const TOKEN_DECIMALS = 6;
   const TOKENS_PER_BULL = BigInt(1_000_000) * BigInt(10 ** TOKEN_DECIMALS); // 1e12
@@ -303,16 +316,48 @@ describe("bullpeg", () => {
     );
   });
 
+  it("SECURITY: non-upgrade-authority cannot initialize (front-run guard)", async () => {
+    // alice is NOT the program's upgrade authority. Must be rejected
+    // BEFORE the bank exists, so the failure is the auth gate — not the
+    // singleton-already-exists guard. This is the fix for the otherwise
+    // permissionless `initialize` that a bot could front-run on mainnet
+    // deploy to brick the singleton bank with a garbage mint.
+    let errored = false;
+    try {
+      await program.methods
+        .initialize(tokenMint)
+        .accounts({
+          bank: bankPda,
+          authority: alice.publicKey,
+          program: program.programId,
+          programData: programDataPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([CU_BUMP], true)
+        .signers([alice])
+        .rpc();
+    } catch (e: any) {
+      errored = true;
+      expect(String(e)).to.match(/UnauthorizedInitializer|0x1771|ConstraintAddress|constraint/i);
+    }
+    expect(errored, "non-authority initialize must fail").to.equal(true);
+
+    // Bank must NOT have been created by the failed attempt.
+    const acc = await connection.getAccountInfo(bankPda);
+    expect(acc, "bank PDA must not exist after rejected init").to.equal(null);
+  });
+
   it("initializes the bank", async () => {
     await program.methods
       .initialize(tokenMint)
       .accounts({
         bank: bankPda,
-        authority: alice.publicKey,
+        authority: adminPk,
+        program: program.programId,
+        programData: programDataPda,
         systemProgram: SystemProgram.programId,
       })
       .preInstructions([CU_BUMP], true)
-      .signers([alice])
       .rpc();
 
     const bank = await program.account.bullBank.fetch(bankPda);
@@ -332,13 +377,13 @@ describe("bullpeg", () => {
     collectionMint = Keypair.generate();
     const { collectionAuthority, collectionMetadata, collectionMasterEdition,
             authorityCollectionAta } =
-      deriveCollectionPdas(program.programId, collectionMint.publicKey, alice.publicKey);
+      deriveCollectionPdas(program.programId, collectionMint.publicKey, adminPk);
 
     await program.methods
       .initializeCollection()
       .accounts({
         bank: bankPda,
-        authority: alice.publicKey,
+        authority: adminPk,
         collectionMint: collectionMint.publicKey,
         collectionAuthority,
         authorityCollectionAta,
@@ -351,7 +396,7 @@ describe("bullpeg", () => {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .preInstructions([CU_BUMP], true)
-      .signers([alice, collectionMint])
+      .signers([collectionMint])
       .rpc();
 
     // Bank now records the collection mint
@@ -380,7 +425,7 @@ describe("bullpeg", () => {
     const dupCollectionMint = Keypair.generate();
     const { collectionAuthority, collectionMetadata, collectionMasterEdition,
             authorityCollectionAta } =
-      deriveCollectionPdas(program.programId, dupCollectionMint.publicKey, alice.publicKey);
+      deriveCollectionPdas(program.programId, dupCollectionMint.publicKey, adminPk);
 
     let errored = false;
     try {
@@ -388,7 +433,7 @@ describe("bullpeg", () => {
         .initializeCollection()
         .accounts({
           bank: bankPda,
-          authority: alice.publicKey,
+          authority: adminPk,
           collectionMint: dupCollectionMint.publicKey,
           collectionAuthority,
           authorityCollectionAta,
@@ -401,7 +446,7 @@ describe("bullpeg", () => {
           rent: SYSVAR_RENT_PUBKEY,
         })
         .preInstructions([CU_BUMP], true)
-        .signers([alice, dupCollectionMint])
+        .signers([dupCollectionMint])
         .rpc();
     } catch (e: any) {
       errored = true;

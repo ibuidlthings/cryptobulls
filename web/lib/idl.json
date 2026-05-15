@@ -48,6 +48,20 @@
           "signer": true
         },
         {
+          "name": "program",
+          "docs": [
+            "This program's account — used to locate its ProgramData."
+          ],
+          "address": "A2tUttiL2v2fYxPyeUSZ75CqnjDp5sewCqcnXubgoxm"
+        },
+        {
+          "name": "program_data",
+          "docs": [
+            "The program's upgrade-authority record. Only the wallet that holds",
+            "the upgrade authority of *this* deployed program may initialize."
+          ]
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -1186,6 +1200,11 @@
       "code": 6012,
       "name": "NotProgramAuthority",
       "msg": "Caller is not the program authority recorded in BullBank"
+    },
+    {
+      "code": 6013,
+      "name": "UnauthorizedInitializer",
+      "msg": "Only the program's upgrade authority may call initialize"
     }
   ],
   "types": [
