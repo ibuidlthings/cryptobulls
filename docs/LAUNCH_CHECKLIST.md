@@ -37,8 +37,10 @@ do not proceed until verified.
 - [ ] YOU — *(Optional)* add a Bash force-push permission rule in Claude
       Code settings if you want the cosmetic `@` subject of commit
       `14cfe2e` fixed. No functional impact; skipping is fine.
-- [ ] YOU — Ensure you can fund deployer `GMrJpP7Sa…` with ~5 SOL on
-      mainnet at launch, and that you control treasury `FRZJ…TwQ`.
+- [ ] YOU — Ensure you can fund deployer `GMrJpP7Sa…` with **~9 SOL** on
+      mainnet at launch (verified: 5.82 SOL ProgramData rent + ~5.82
+      transient deploy buffer + IDL/init/fees; ~5 SOL is NOT enough), and
+      that you control treasury `FRZJ…TwQ`.
 
 🔒 **GATE 0:** Do not start Phase 1 until $BULLS is live on pump.fun and
 you have the real mint address.
@@ -61,8 +63,9 @@ reach `initialize` — it locks permanently.
 ## Phase 2 — Mainnet deploy (ME executes, YOU fund)
 
 - [ ] YOU — Fund deployer `GMrJpP7SaUkfyizsB3b8GeKWgDiqac3g5EaMGnMtkXCj`
-      (= bulls-box `/root/.config/solana/id.json`) with ~5 SOL mainnet.
-      Tell me when done. *(NOT FRZJ…TwQ.)*
+      (= bulls-box `/root/.config/solana/id.json`) with **~9 SOL** mainnet
+      (5.82 ProgramData rent + ~5.82 transient buffer + IDL/fees; ~5 is
+      NOT enough). Tell me when done. *(NOT FRZJ…TwQ.)*
 - [ ] ME — `anchor build` on the box from the royalty-bearing source;
       confirm `bullpeg.so` + `bullpeg.json` fresh, 0 errors.
 - [ ] ME — `anchor deploy --provider.cluster mainnet-beta`; verify

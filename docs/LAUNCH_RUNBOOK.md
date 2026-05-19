@@ -126,9 +126,15 @@ version (already synced + built + 12/12 tests pass on devnet as of
      `ROYALTY_TREASURY = FRZJpAtPcWJBRFziY6dZkBHMBSWVi12hXAtAJEHawTwQ`
      and `ROYALTY_BPS = 500` in `programs/bullpeg/src/instructions/wrap_bull.rs`.
 1. **Fund the deployer/upgrade-authority wallet** `GMrJpP7Sa...`
-   (`/root/.config/solana/id.json`) with **~5 SOL on mainnet** (program
-   rent ≈ 3–4 SOL + IDL rent ≈ 0.1 + init + fees). This is the DEPLOYER
-   key, not the royalty treasury — see the wallet-roles table above.
+   (`/root/.config/solana/id.json`) with **~9 SOL on mainnet**. Evidence-
+   based (verified 2026-05-18, .so = 417,920 bytes): ProgramData is
+   allocated at 2× the binary, rent-exempt minimum **5.82 SOL** (permanent),
+   PLUS a transient deploy **buffer of ~5.82 SOL** held during upload
+   (refunded when the buffer closes), + IDL account ≈ 0.15 + initialize +
+   fees + retry margin. **~5 SOL is NOT enough — it fails mid-deploy and
+   strands SOL in a buffer.** Fund ~9 SOL (absolute floor ~7). Any excess
+   is recoverable. This is the DEPLOYER key, not the royalty treasury —
+   see the wallet-roles table above.
 2. **Build fresh from the royalty-bearing source:**
    ```
    cd /root/bullpeg-sol && anchor build
